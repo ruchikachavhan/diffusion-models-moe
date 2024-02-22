@@ -46,7 +46,7 @@ def main():
     model, num_geglu = get_sd_model(args)
     model = model.to(args.gpu)
 
-    imgs, anns = coco_dataset(args.data_path, 'val')
+    imgs, anns = coco_dataset(args.data_path, 'val', args.num_images)
 
     # Neuron receiver to store gates for every sample
     neuron_receiver = NeuronReceiver()

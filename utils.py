@@ -10,18 +10,24 @@ def make_dirs(args):
         args.res_path = os.path.join(args.res_path, 'fine-tuned-relu')
         if not os.path.exists(args.res_path):
             os.makedirs(args.res_path)
+    else:
+        args.res_path = os.path.join(args.res_path, 'baseline')
+        if not os.path.exists(args.res_path):
+            os.makedirs(args.res_path)
+
     # make image directory
-    if not os.path.exists(os.path.join(args.res_path, 'images')):
-        os.makedirs(os.path.join(args.res_path, 'images'))
-    # make sparsity directory
-    if not os.path.exists(os.path.join(args.res_path, 'sparsity')):
-        os.makedirs(os.path.join(args.res_path, 'sparsity'))
-    
+    if not os.path.exists(os.path.join(args.res_path, args.model_id)):
+        os.makedirs(os.path.join(args.res_path, args.model_id))
+        os.makedirs(os.path.join(args.res_path, args.model_id, 'moefication'))
+
+
     # make directory for model id
-    if not os.path.exists(os.path.join(args.res_path, 'images', args.model_id)):
-        os.makedirs(os.path.join(args.res_path, 'images', args.model_id))
-    if not os.path.exists(os.path.join(args.res_path, 'sparsity', args.model_id)):
-        os.makedirs(os.path.join(args.res_path, 'sparsity', args.model_id))
+    if not os.path.exists(os.path.join(args.res_path, args.model_id, 'images')):
+        os.makedirs(os.path.join(args.res_path, args.model_id, 'images'))
+        os.makedirs(os.path.join(args.res_path, args.model_id, 'images', 'evaluation_coco'))
+
+    if not os.path.exists(os.path.join(args.res_path, args.model_id, 'sparsity')):
+        os.makedirs(os.path.join(args.res_path, args.model_id, 'sparsity'))
 
 def get_sd_model(args):
 

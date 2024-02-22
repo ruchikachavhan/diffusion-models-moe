@@ -1,3 +1,4 @@
 results/*
 *.png
 __pycache__/
+results_1/
