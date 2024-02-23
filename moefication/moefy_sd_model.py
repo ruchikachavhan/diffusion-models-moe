@@ -23,13 +23,13 @@ def get_model_block_config(model_id):
         config['down_blocks']['layer_idx'] = [0, 1, 2]
         config['down_blocks']['attention_idx'] = [0, 1]
         config['mid_block'] = {}
-        config['mid_block']['layer_idx'] = [0]
+        config['mid_block']['layer_idx'] = [-1]
         config['mid_block']['attention_idx'] = [0]
         config['up_blocks'] = {}
         config['up_blocks']['layer_idx'] = [1, 2, 3]
         config['up_blocks']['attention_idx'] = [0, 1, 2]
     return config
-        
+
     
 def get_args():
     parser = argparse.ArgumentParser()
@@ -43,7 +43,7 @@ def get_args():
     parser.add_argument('--model-id', type=str, default="runwayml/stable-diffusion-v1-5", help='model id')
     parser.add_argument('--timesteps', type=int, default=51, help='number of denoising time steps')
     parser.add_argument('--num-layer', type=int, default=3, help='number of layers')
-    parser.add_argument('--num-expert', type=int, default=64, help='number of experts')
+    parser.add_argument('--num-neurons-expert', type=int, default=20, help='number of neurons in each expert')
     parser.add_argument('--templates', type=str, 
                         default='{}.{}.attentions.{}.transformer_blocks.0.ff.net.0.proj.weight',
                         help='weight names of the first linear layer in each FFN (use comma to separate multiple templates)')
@@ -58,18 +58,26 @@ def make_templates(args, config):
     for t in template:
         for key in config.keys():
             for layer in config[key]['layer_idx']:
-                for att in config[key]['attention_idx']:
-                    templates.append(t.format(key, layer, att))
+                if layer == -1:
+                    t_ = '{}.attentions.{}.transformer_blocks.0.ff.net.0.proj.weight'
+                    for att in config[key]['attention_idx']:
+                        templates.append(t_.format(key, att))
+                else:
+                    for att in config[key]['attention_idx']:
+                        templates.append(t.format(key, layer, att))
     return templates
 
 def test_template(templates, model):
     model_ffns = []
     for name, param in model.unet.named_modules():
         if 'ff.net' in name and isinstance(param, GEGLU):
+            print(f"Found FFN: {name}")
             # append W1 of the FFN
             model_ffns.append(name + '.proj.weight')
-    # assert that the two lists should be exactly the same
-    assert model_ffns.sort() == templates.sort()
+    
+    print(model_ffns, templates)
+    #  assert that every element in the lists should be the same
+    assert all([ffn in templates for ffn in model_ffns])
     print("All FFNs are considered for MOEfication. Test passed.")
             
 def main():
@@ -81,7 +89,7 @@ def main():
 
     torch.save(model.unet.state_dict(), os.path.join(args.res_path, args.model_id, 'moefication', 'model.pt'))
 
-    config = moe_utils.ModelConfig(os.path.join(args.res_path, args.model_id, 'moefication', 'model.pt'), args.res_path, split_num=args.num_expert)
+    config = moe_utils.ModelConfig(os.path.join(args.res_path, args.model_id, 'moefication', 'model.pt'), args.res_path, split_size=args.num_neurons_expert)
 
     templates = args.templates.split(',')
     templates = make_templates(args, block_config)
@@ -89,6 +97,7 @@ def main():
 
     for template in templates:
         print(f"Splitting parameters for {template}")
+        # For every FFN, we noe split the weights into clusters by using KMeansConstrained
         split = moe_utils.ParamSplit(config, template)
         split.split()
         split.cnt()

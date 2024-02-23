@@ -12,8 +12,7 @@ from re import template
 from torchvision import transforms
 from torchmetrics.image.fid import FrechetInceptionDistance as FID
 from transformers import CLIPProcessor, CLIPModel, AutoTokenizer, AutoProcessor
-from check_sparsity import coco_dataset
-from utils import make_dirs, get_sd_model
+from utils import make_dirs, get_sd_model, coco_dataset
 
 
 class CLIPModelWrapper(torch.nn.Module):

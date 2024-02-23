@@ -2,3 +2,7 @@ results/*
 *.png
 __pycache__/
 results_1/
+*.jpg
+*.jpeg
+*.npy
+*.json

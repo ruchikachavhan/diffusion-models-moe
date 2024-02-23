@@ -9,20 +9,8 @@ from ast import arg
 from PIL import Image
 from re import template
 from torchvision import transforms
-from utils import make_dirs, get_sd_model
+from utils import make_dirs, get_sd_model, coco_dataset
 from relufy_model import NeuronReceiver
-
-def coco_dataset(data_path, split, num_images=1000):
-    with open(os.path.join(data_path, f'annotations/captions_{split}2014.json')) as f:
-        data = json.load(f)
-    data = data['annotations']
-    # select 30k images randomly
-    np.random.seed(0)
-    np.random.shuffle(data)
-    data = data[:num_images]
-    imgs = [os.path.join(data_path, f'{split}2014', 'COCO_' + split + '2014_' + str(ann['image_id']).zfill(12) + '.jpg') for ann in data]
-    anns = [ann['caption'] for ann in data]
-    return imgs, anns
 
 def get_args():
     parser = argparse.ArgumentParser()

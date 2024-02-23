@@ -36,10 +36,10 @@ def load_hidden_states(folder, filename):
 
 class ModelConfig:
 
-    def __init__(self, filename, folder, split_num):
+    def __init__(self, filename, folder, split_size):
         self.filename = filename
         self.folder = folder
-        self.split_num = split_num
+        self.split_size = split_size
 
 class LayerSplit:
 
@@ -70,8 +70,12 @@ class LayerSplit:
         self.neuron_num = self.ffn_weight.shape[0] //2
         # select only last half of the weights 
         self.ffn_weight = self.ffn_weight[self.neuron_num:, :]
-        self.split_size = self.neuron_num // self.config.split_num
-        assert self.split_size * self.config.split_num == self.neuron_num
+        # self.split_size = self.neuron_num // self.config.split_num
+        # Number of neurons per expert
+        self.split_size = self.config.split_size
+        # Number of experts
+        self.split_num = self.neuron_num // self.split_size
+        assert self.split_num * self.config.split_size == self.neuron_num
 
 class RandomSplit(LayerSplit):
     
@@ -93,9 +97,13 @@ class ParamSplit(LayerSplit):
     def split(self):
         self.load_param()
         ffn_weight_norm = sklearn.preprocessing.normalize(self.ffn_weight)
+        # KMeansConstrained is a mmodified version of KMeans that allows you to specify the minimum and maximum size of a cluster
+        # Here, we want all clusters/experts to have the same number of neurons, so we set the minimum and maximum size to be the same
+        # Clustering is done on the rows of the weight matrix
+        # The shape of weight matrix is [hidden_dimension, model_dimension], so we cluster the hidden dimension (which is also equal to the number of neurons)
+        kmeans = KMeansConstrained(n_clusters=self.split_num, size_min=self.split_size, size_max=self.split_size, random_state=0).fit(ffn_weight_norm, None)
         
-        kmeans = KMeansConstrained(n_clusters=self.config.split_num, size_min=self.split_size, size_max=self.split_size, random_state=0).fit(ffn_weight_norm, None)
-        
+        # The labels are the cluster number for each neuron
         self.labels = [x for x in kmeans.labels_]
 
 class BlockCenter:

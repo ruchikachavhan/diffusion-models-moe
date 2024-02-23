@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import torch
+import json
 from diffusers import AutoPipelineForText2Image
 from diffusers import StableDiffusionPipeline, UNet2DConditionModel
 from relufy_model import find_and_change_geglu
@@ -42,7 +43,7 @@ def get_sd_model(args):
             model = StableDiffusionPipeline.from_pretrained("runwayml/stable-diffusion-v1-5", unet=unet, torch_dtype=torch.float16)
         else:
             print("Loading from pre-trained model", args.model_id)
-            model = StableDiffusionPipeline.from_pretrained(args.model_id, torch_dtype=torch.float32)
+            model = StableDiffusionPipeline.from_pretrained(args.model_id, torch_dtype=torch.float16)
         num_geglu = 16
 
     elif 'xl-base-1.0' in args.model_id:
@@ -50,3 +51,15 @@ def get_sd_model(args):
         num_geglu = 70
 
     return model, num_geglu
+
+def coco_dataset(data_path, split, num_images=1000):
+    with open(os.path.join(data_path, f'annotations/captions_{split}2014.json')) as f:
+        data = json.load(f)
+    data = data['annotations']
+    # select 30k images randomly
+    np.random.seed(0)
+    np.random.shuffle(data)
+    data = data[:num_images]
+    imgs = [os.path.join(data_path, f'{split}2014', 'COCO_' + split + '2014_' + str(ann['image_id']).zfill(12) + '.jpg') for ann in data]
+    anns = [ann['caption'] for ann in data]
+    return imgs, anns
