@@ -121,7 +121,6 @@ class MOENeuronReceiver:
         self.gates = []
 
 
-
 def modify_ffn(ffn, path, k):
     assert type(ffn) == GEGLU
     labels = torch.load(path)

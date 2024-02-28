@@ -55,7 +55,7 @@ class NeuronReceiver:
         for hook in hooks:
             hook.remove()
     
-    def observe_activation(self, model, img, ann):
+    def observe_activation(self, model, ann):
         hooks = []
         # reset the gates
         self.gates = []

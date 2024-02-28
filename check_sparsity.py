@@ -50,9 +50,9 @@ def main():
         print("Iter: ", iter)
         print("text: ", ann)
         out, gates = neuron_receiver.observe_activation(model, img, ann)
-        if iter < 10:
-            # Save some images
-            out.save(os.path.join(args.res_path, 'images', args.model_id, f'img_{iter}.jpg'))
+        # if iter < 10:
+        #     # Save some images
+        #     out.save(os.path.join(args.res_path, 'images', args.model_id, f'img_{iter}.jpg'))
        
         all_results = {}
         all_results['time_steps'] = {}

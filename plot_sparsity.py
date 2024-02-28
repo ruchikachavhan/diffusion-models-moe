@@ -8,7 +8,7 @@ import json
 
 
 model_name = 'runwayml/stable-diffusion-v1-5'
-res_path = 'results/stable-diffusion/sparsity'
+res_path = 'results/stable-diffusion/fine-tuned-relu/sparsity'
 num_act = 16
 
 # read all the files
@@ -16,7 +16,7 @@ files = os.listdir(os.path.join(res_path, model_name))
 # get the sparsity files
 sparsity_files = [f for f in files if 'sparsity' in f]
 
-num_samples = 100
+num_samples = 1000
 num_timesteps = 50
 neg_values = [[] for _ in range(num_timesteps)]
 pos_values = [[] for _ in range(num_timesteps)]
