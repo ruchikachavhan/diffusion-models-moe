@@ -6,7 +6,7 @@ import os
 from PIL import Image
 import json
 
-
+# TODO  - Change this code to use the new config file
 model_name = 'runwayml/stable-diffusion-v1-5'
 res_path = 'results/stable-diffusion/fine-tuned-relu/sparsity'
 num_act = 16

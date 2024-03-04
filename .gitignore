@@ -1,8 +1,11 @@
 results/*
 *.png
 __pycache__/
-results_1/
 *.jpg
 *.jpeg
 *.npy
 *.json
+test_images/*
+sparsity/__pycache__
+moefication/__pycache__
+modularity/__pycache__

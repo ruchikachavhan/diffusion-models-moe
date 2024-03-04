@@ -12,7 +12,8 @@ from re import template
 from torchvision import transforms
 from torchmetrics.image.fid import FrechetInceptionDistance as FID
 from transformers import CLIPProcessor, CLIPModel, AutoTokenizer, AutoProcessor
-from utils import make_dirs, get_sd_model, coco_dataset
+sys.path.append(os.getcwd())
+from utils import get_sd_model, coco_dataset, Config
 
 
 class CLIPModelWrapper(torch.nn.Module):
@@ -56,10 +57,8 @@ def evaluate_sd_model(model, imgs, anns, args, transform):
         generated_images.append(generated_image)
         if iter < 50:
             # Save some images
-            torchvision.utils.save_image(original_image, os.path.join(args.res_path, args.model_id, 
-                                                        'images', 'evaluation_coco', f'original_{iter}.png'))
-            torchvision.utils.save_image(generated_image, os.path.join(args.res_path, args.model_id, 
-                                                        'images', 'evaluation_coco', f'generated_{iter}.png'))
+            torchvision.utils.save_image(original_image, os.path.join(args.save_path, f'original_{iter}.png'))
+            torchvision.utils.save_image(generated_image, os.path.join(args.save_path, f'generated_{iter}.png'))
             texts.append(text)
         iter += 1
 
@@ -71,43 +70,31 @@ def evaluate_sd_model(model, imgs, anns, args, transform):
     return fid, texts
 
 
-def get_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--data-path', type=str, default='../COCO-vqa', help='path to the coco dataset')
-    parser.add_argument('--blocks-to-change', nargs='+', default=['down_block', 'mid_block', 'up_block'], help='blocks to change the activation function')
-    parser.add_argument('--res-path', type=str, default='results/stable-diffusion/', help='path to store the results of moefication')
-    parser.add_argument('--dbg', action='store_true', help='debug mode')
-    parser.add_argument('--gpu', type=int, default=0, help='gpu id')
-    parser.add_argument('--num-images', type=int, default=1000, help='number of images to test')
-    parser.add_argument('--fine-tuned-unet', type = str, default = None, help = "path to fine-tuned unet model")
-    parser.add_argument('--model-id', type=str, default="runwayml/stable-diffusion-v1-5", help='model id')
-    parser.add_argument('--change-activation', action='store_true', help='change the activation function')
-    parser.add_argument('--calculate-fid-original', action='store_true', help='calculate FID')
-    args = parser.parse_args()
-    return args
-
 def main():
-    args = get_args()
-    make_dirs(args)
+    args = Config('experiments/config.yaml', 'images/evaluation_coco')
 
-    imgs, anns = coco_dataset(args.data_path, 'val', args.num_images)
-    transform = transforms.Compose([transforms.Resize((224, 224)), transforms.ToTensor()])
+    # Model
     model, num_geglu = get_sd_model(args) 
     model = model.to(args.gpu)
 
-    if args.calculate_fid_original: 
+    # Dataset
+    imgs, anns = coco_dataset(args.dataset['path'], 'val', args.inference['num_images'])
+    transform = transforms.Compose([transforms.Resize((224, 224)), transforms.ToTensor()])
+    
+    
+    if args.sparsity_checks['calculate_fid_original']: 
         assert args.fine_tuned_unet is None, "Pre-trained model needs to be loaded here"
         fid, texts = evaluate_sd_model(model, imgs, anns, args, transform)
-        with open(os.path.join(args.res_path, args.model_id, 'images', 'evaluation_coco', 'fid_scores.txt'), 'w') as f:
+        with open(os.path.join(args.save_path, 'fid_scores.txt'), 'w') as f:
             f.write(f"FID score: {fid}\n")
         with open(os.path.join(args.res_path, 'texts.txt'), 'w') as f:
             for text in texts:
                 f.write(text + '\n')
 
-    if args.change_activation:
+    if args.sparsity_checks['change_activation']:
         assert args.fine_tuned_unet is not None, "Please provide the path to the fine-tuned unet model"
         fid, _ = evaluate_sd_model(model, imgs, anns, args, transform)
-        with open(os.path.join(args.res_path, args.model_id, 'images', 'evaluation_coco', 'fid_scores.txt'), 'w') as f:
+        with open(os.path.join(args.save_path, 'fid_scores.txt'), 'w') as f:
             f.write(f"FID score: {fid}\n")
     
 
