@@ -23,23 +23,6 @@ sys.path.append('moefication')
 from helper import modify_ffn_to_experts
 
 
-def get_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--data-path', type=str, default='../COCO-vqa', help='path to the coco dataset')
-    parser.add_argument('--blocks-to-change', nargs='+', default=['down_block', 'mid_block', 'up_block'], help='blocks to change the activation function')
-    parser.add_argument('--gpu', type=int, default=0, help='gpu id')
-    parser.add_argument('--res-path', type=str, default='results_1/stable-diffusion/', help='path to store the results of moefication')
-    parser.add_argument('--dbg', action='store_true', help='debug mode')
-    parser.add_argument('--num-images', type=int, default=1000, help='number of images to test')
-    parser.add_argument('--fine-tuned-unet', type = str, default = None, help = "path to fine-tuned unet model")
-    parser.add_argument('--model-id', type=str, default="runwayml/stable-diffusion-v1-5", help='model id')
-    parser.add_argument('--timesteps', type=int, default=51, help='number of denoising time steps')
-    parser.add_argument('--num-layer', type=int, default=3, help='number of layers')
-    parser.add_argument('--topk-experts', type=float, default=1, help='ratio of experts to select')
-    parser.add_argument('--adjective', type=str, default='white', help='adjective to add to things')
-    args = parser.parse_args()
-    return args
-
 class NeuronSpecialisation(NeuronPredictivity):
     def __init__(self, path_expert_indx, T, n_layers):
         super(NeuronSpecialisation, self).__init__(T, n_layers)
@@ -146,8 +129,9 @@ def main():
     model = model.to(args.gpu)
 
     # Neuron receiver with forward hooks
-    print(f"All skilled experts saved in {args.skill_expert_path}")
-    neuron_receiver = NeuronSpecialisation(path_expert_indx = args.skill_expert_path, T = args.timesteps, n_layers = args.n_layers)
+    condition = args.modularity['condition']
+    path = args.modularity[f'skilled_experts_{condition}']
+    neuron_receiver = NeuronSpecialisation(path_expert_indx = path, T = args.timesteps, n_layers = args.n_layers)
                                            
     # Dataset from things.txt
     # read things.txt
@@ -167,7 +151,7 @@ def main():
     remove_experts(adj_prompts, model, neuron_receiver, args)
 
     # read val_dataset
-    with open(f'modularity/val_things_{adjectives}') as f:
+    with open(f'modularity/val_things_{adjectives}.txt') as f:
         val_objects = f.readlines()
     
     val_base_prompts = [f'a {thing.strip()}' for thing in val_objects]

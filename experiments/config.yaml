@@ -10,7 +10,7 @@ moefication:
 modularity:
   adjective: 'white'
   margin: 0.05
-  condition: 'greater'
+  condition: 't_test'
   skilled_neuron_ratio: 0.5
 dataset:
   path: '../COCO-vqa'
@@ -21,7 +21,7 @@ res_path: 'results/stable-diffusion'
 model_id: 'runwayml/stable-diffusion-v1-5'
 n_layers: 16
 fine_tuned_unet: '../diffusers/examples/text_to_image/relufied-stable-diffusion-v1-5/checkpoint-14000/'
-gpu: 2
+gpu: 3
 timesteps: 51
 dbg: false
   

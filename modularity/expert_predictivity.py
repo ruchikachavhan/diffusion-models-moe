@@ -8,6 +8,7 @@ import sys
 sys.path.append(os.getcwd())
 import utils
 
+
 # load expert clusters from param split
 def load_expert_clusters(files, folder):
     expert_clusters = {}
@@ -20,9 +21,6 @@ def load_expert_clusters(files, folder):
 def skilled_condition(base_pred, adj_pred, args):
     if args.modularity['condition'] == 'greater':
         return adj_pred > base_pred + args.modularity['margin']
-    elif args.modularity['condition'] == 't-test':
-        print('t-test condition not implemented yet')
-        raise NotImplementedError
 
 def main():
     args = utils.Config('experiments/config.yaml', 'modularity')
