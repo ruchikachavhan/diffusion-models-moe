@@ -17,7 +17,8 @@ from diffusers.models.activations import GEGLU
 
             
 def main():
-    args = utils.Config('experiments/config.yaml', 'moefication')
+    args = utils.Config('experiments/moefy_config.yaml', 'moefication')
+    args.configure('moefication')
 
     # Model
     model, num_geglu = utils.get_sd_model(args)

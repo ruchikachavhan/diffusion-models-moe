@@ -10,19 +10,34 @@ from ast import arg
 from PIL import Image
 from re import template
 from collections import Counter
-from expert_predictivity import load_expert_clusters
+from greater import load_expert_clusters
 sys.path.append('moefication')
-from helper import modify_ffn_to_experts, initialise_expert_counter
-from freq_expert_select import FrequencyMeasure
+from helper import modify_ffn_to_experts
+from neuron_receivers import FrequencyMeasure
 sys.path.append(os.getcwd())
 import utils
-import eval_coco as ec
-from diffusers.models.activations import GEGLU
+from scipy import stats
+
+
+def update_table(table, freq_base, freq_adj):
+    # update the contingency table
+    # 0, 0 is the when freq base and freq adj is True
+    # 0, 1 is when freq base is False and freq adj is True
+    # 1, 0 is when freq base is Trye and freq adj is False
+    # 1, 1 is when freq base and freq adj is False
+    table[0, 0] += (freq_base & freq_adj).sum() 
+    table[0, 1] += (freq_base & ~freq_adj).sum()
+    table[1, 0] += (~freq_base & freq_adj).sum()
+    table[1, 1] += (~freq_base & ~freq_adj).sum()
+    return table
+
+def check_condition(val, args):
+    return val > args.modularity['condition']['skill_ratio']
 
 def main():
-    args = utils.Config('experiments/config.yaml', 'modularity')
-    args.modularity['skill_type'] = 'moefy'
+    args = utils.Config('experiments/mod_config_moefy_compare.yaml', 'modularity')
     args.configure('modularity')
+
     topk = float(sys.argv[1])
     if topk is not None:
         args.moefication['topk_experts'] = topk
@@ -33,7 +48,7 @@ def main():
     model, num_geglu = utils.get_sd_model(args)
     model = model.to(args.gpu)
     # Change FFNS to a mixture of experts
-    model = modify_ffn_to_experts(model, args)
+    model, ffn_names_list, num_experts_per_ffn = modify_ffn_to_experts(model, args)
 
     # load expert clusters
     param_split = os.listdir(os.path.join(args.res_path, 'param_split'))
@@ -51,46 +66,64 @@ def main():
     adj_prompts = [f'a {adjectives} {thing}' for thing in things]
 
     # Neuron receiver with forward hooks to measure predictivity
-    freq_counter = FrequencyMeasure()
-    expert_counter, ffn_names_list = initialise_expert_counter(model)
-    expert_counter_adj, _ = initialise_expert_counter(model)
-
+    freq_counter = FrequencyMeasure(args.timesteps, args.n_layers, num_experts_per_ffn, ffn_names_list)
     iter = 0
+
+    contingency_table = {}
+    for t in range(args.timesteps):
+        contingency_table[t] = {}
+        for ffn_name in ffn_names_list:
+            contingency_table[t][ffn_name] = {}
+            for expt_idx in range(max(expert_clusters[ffn_name]) + 1):
+                contingency_table[t][ffn_name][expt_idx] = np.zeros((2, 2))
+
     for ann, ann_adj in tqdm.tqdm(zip(base_prompts, adj_prompts)):
         if iter >= 5 and args.dbg:
             break
         print("text: ", ann, ann_adj)
 
-        freq_counter.clear_counter()
+        freq_counter.reset()
         out, _ = freq_counter.observe_activation(model, ann)
         label_counter = freq_counter.label_counter
 
-        freq_counter.clear_counter()
+        freq_counter.reset()
         out_adj, _ = freq_counter.observe_activation(model, ann_adj)
         label_counter_adj = freq_counter.label_counter
 
-        for i in range(0, len(label_counter), num_geglu):
-            gate_timestep, gate_timestep_adj = label_counter[i:i+num_geglu], label_counter_adj[i:i+num_geglu]
-            for j, labels, labels_adj in zip(range(num_geglu), gate_timestep, gate_timestep_adj):
-                if j > num_geglu:
-                    continue
-                for label, label_adj in zip(label, label_adj):
-                    expert_counter[i//num_geglu][ffn_names_list[j]][label] += 1
-                    expert_counter_adj[i//num_geglu][ffn_names_list[j]][label_adj] += 1
-
+        # update the contigency tables for each timestep
+        for t in range(args.timesteps):
+            for ffn_name in ffn_names_list:
+                expert_indices = expert_clusters[ffn_name]
+                for expt_idx in range(max(expert_indices) + 1):
+                    # frequency of expert in base prompt and adj prompt
+                    # For every sampe, frequency counter returns the average number of times expert was selected by all tokens. 
+                    # If more than 50% of the tokens in the latent space select the expert, then the expert is considered skilled
+                    freq_base = check_condition(label_counter[t][ffn_names_list.index(ffn_name)][expt_idx], args)
+                    freq_adj = check_condition(label_counter_adj[t][ffn_names_list.index(ffn_name)][expt_idx], args)
+                    # update the contingency table
+                    contingency_table[t][ffn_name][expt_idx] = update_table(contingency_table[t][ffn_name][expt_idx], freq_base, freq_adj)
+                      
         iter += 1
-    
-    # divide by number of images
+
+    # print the contingency tables
     for t in range(args.timesteps):
         for ffn_name in ffn_names_list:
-            expert_counter[t][ffn_name] = expert_counter[t][ffn_name].tolist()
-            expert_counter_adj[t][ffn_name] = expert_counter_adj[t][ffn_name].tolist()
-            expert_indices = expert_clusters[ffn_name]
-            for expt_idx in range(max(expert_indices) + 1):
-                # get the skilled neurons in the expert
-                neurons_in_expert = torch.tensor(expert_clusters[ffn_name]) == expt_idx
-                
-    
+            for expt_idx in range(max(expert_clusters[ffn_name]) + 1):
+                print(f"Contingency table for timestep {t}, ffn {ffn_name}, expert {expt_idx}")
+                print(contingency_table[t][ffn_name][expt_idx])
+                table = contingency_table[t][ffn_name][expt_idx]
+                num_elements_zero = (table == 0).sum()
+                if num_elements_zero >= 3:
+                    print(f"No elements for expert {expt_idx} at timestep {t} and ffn {ffn_name}")
+                    continue
+                # check if elements 
+                # calculate the chi square value
+                chi2, p, dof, ex = stats.chi2_contingency(contingency_table[t][ffn_name][expt_idx])
+                print(f"Chi2 value: {chi2}, p value: {p}")
+                # if p value is less than 0.05, then the expert is skilled
+                if p < 0.05:
+                    print(f"Expert {expt_idx} is skilled at timestep {t} and ffn {ffn_name}")
+
 
 if __name__ == "__main__":
     main()

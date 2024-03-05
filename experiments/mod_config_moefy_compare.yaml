@@ -1,7 +1,14 @@
-sparsity_checks:
-  name: SparsityChecks
-  calculate_fid_original: false
-  change_activation: true
+moefication:
+  name: Moefication
+  expert_size: 20
+  templates: '%s.%s.attentions.%s.transformer_blocks.0.ff.net.0.proj.weight'
+  topk_experts: 1.0
+modularity:
+  adjective: 'white'
+  margin: 0.05
+  condition:
+    name: 'moefy_copmare'
+    skill_ratio: 0.5
 dataset:
   path: '../COCO-vqa'
 inference:
@@ -13,7 +20,7 @@ n_layers: 16
 fine_tuned_unet: '../diffusers/examples/text_to_image/relufied-stable-diffusion-v1-5/checkpoint-14000/'
 gpu: 3
 timesteps: 51
-dbg: false
+dbg: true
   
 
   

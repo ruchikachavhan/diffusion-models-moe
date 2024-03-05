@@ -1,7 +1,9 @@
-sparsity_checks:
-  name: SparsityChecks
-  calculate_fid_original: false
-  change_activation: true
+moefication:
+  name: Moefication
+  expert_size: 20
+  templates: '%s.%s.attentions.%s.transformer_blocks.0.ff.net.0.proj.weight'
+  topk_experts: 1.0
+modularity: null
 dataset:
   path: '../COCO-vqa'
 inference:

@@ -18,19 +18,12 @@ def load_expert_clusters(files, folder):
         expert_clusters[file] = data
     return expert_clusters
 
-def skilled_condition(base_pred, adj_pred, args):
-    if args.modularity['condition'] == 'greater':
-        return adj_pred > base_pred + args.modularity['margin']
 
 def main():
-    args = utils.Config('experiments/config.yaml', 'modularity')
+    args = utils.Config('experiments/mod_config_greater.yaml', 'modularity')
     args.configure('modularity')
 
-    # Make directory to save results
-    adjective = args.modularity['adjective']
-    if not os.path.exists(os.path.join(args.res_path, 'modularity', adjective, 'experts_accuracy_greater_50')):
-        os.makedirs(os.path.join(args.res_path, 'modularity', adjective, 'experts_accuracy_greater_50'))
-
+    # load parameter splits from moefication
     param_split = os.listdir(os.path.join(args.res_path, 'param_split'))
 
     # load expert clusters
@@ -39,10 +32,9 @@ def main():
 
     # get neuron predictivity values
     predictivity_data = {}
-    predictivity_data['base'] = json.load(open(os.path.join(args.save_path, 'predictivity_base.json'), 'r'))
-    predictivity_data['adj'] = json.load(open(os.path.join(args.save_path, 'predictivity_adj.json'), 'r'))
+    predictivity_data['base'] = json.load(open(os.path.join(args.save_path, args.modularity['condition']['base_prompts'])))
+    predictivity_data['adj'] = json.load(open(os.path.join(args.save_path, args.modularity['condition']['concept_prompts'])))
 
-    
     for t_step in range(0, len(predictivity_data['base']['time_steps'].keys())):
         print(f'Processing timestep {t_step}')
         # for every timestep plot, average predictivity per expert per layer
@@ -59,7 +51,7 @@ def main():
             base_std = np.array(base_prompt_pred[str(i)]['std'])
             adj_avg = np.array(adj_prompt_pred[str(i)]['avg'])
             adj_std = np.array(adj_prompt_pred[str(i)]['std'])
-            is_greater = skilled_condition(base_avg, adj_avg, args)
+            is_greater = adj_avg > base_avg + args.modularity['margin']
             
             avg_exp_pred = [] # list will store expert specialisation score for a layer
             # cluster neurons into experts
@@ -72,9 +64,9 @@ def main():
                 avg_exp_pred.append(np.mean(is_expert_skilled) * 100.0)
             
             # save expert indices that are skilled
-            skilled_experts = np.where(np.array(avg_exp_pred) > args.modularity['skilled_neuron_ratio'] * 100.0)[0].tolist()
+            skilled_experts = np.where(np.array(avg_exp_pred) > args.modularity['condition']['skill_ratio'] * 100.0)[0].tolist()
             # save as json file
-            with open(os.path.join(args.skill_expert_path, f'timestep_{t_step}_layer_{i}.json'), 'w') as f:
+            with open(os.path.join(args.modularity['skill_expert_path'], f'timestep_{t_step}_layer_{i}.json'), 'w') as f:
                 json.dump(skilled_experts, f)
 
             ax[i//4, i%4].plot(avg_exp_pred, marker='o')
@@ -83,7 +75,7 @@ def main():
             ax[i//4, i%4].set_ylabel('Percentage of skilled neurons', fontsize=20)
         plt.tight_layout()
         # plt.savefig('test_images/experts_accuracy_greater_50.png')
-        plt.savefig(os.path.join(args.save_path, f'avg_neuron_value_timestep_{t_step}.png'))
+        plt.savefig(os.path.join(args.modularity['plots'], f'avg_neuron_value_timestep_{t_step}.png'))
         plt.close()
 
 

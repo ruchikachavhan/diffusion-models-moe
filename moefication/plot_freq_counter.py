@@ -8,7 +8,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 model_name = 'runwayml/stable-diffusion-v1-5'
-res_path = 'results_1/stable-diffusion/fine-tuned-relu'
+res_path = 'results/stable-diffusion/fine-tuned-relu'
 folder_name = 'moefication'
 
 # read all the files

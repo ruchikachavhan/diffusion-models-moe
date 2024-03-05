@@ -64,13 +64,18 @@ def modify_ffn(ffn, path, k):
 
 def modify_ffn_to_experts(model, args):
     # Modify FFN to add expert labels
+    num_experts_per_ffn = {}
+    layer_names = []
     for name, module in model.unet.named_modules():
         if 'ff.net' in name and isinstance(module, GEGLU):
             ffn_name = name + '.proj.weight'
             path = os.path.join(args.res_path, 'param_split', ffn_name)
             modify_ffn(module, path, args.moefication['topk_experts'])
-    
-    return model
+            layer_names.append(ffn_name)
+            num_experts_per_ffn[ffn_name] = module.patterns.shape[0]
+    # For some reason, the mid block keys are after the down block keys, so temporarat solution is to sort the keys in alphabetical order
+    layer_names.sort()
+    return model, layer_names, num_experts_per_ffn
 
 def initialise_expert_counter(model, timesteps=51):
     # Initialise expert frequency selection counter

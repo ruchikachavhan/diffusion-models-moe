@@ -1,27 +1,10 @@
-import json
-import os
-import sys
 import torch
-import tqdm
-import types
-import argparse
+import os
+import json
 import numpy as np
-from ast import arg
-from PIL import Image
-from re import template
-from torchvision import transforms
-sys.path.append('modularity')
-from modularity_analysis import NeuronPredictivity
-sys.path.append(os.getcwd())
-import utils
-import eval_coco as ec
-import relufy_model
 from diffusers.models.activations import GEGLU
-from sklearn.metrics import average_precision_score
-from sklearn import preprocessing
-sys.path.append('moefication')
-from helper import modify_ffn_to_experts
-
+from neuron_receivers.base_receiver import BaseNeuronReceiver
+from neuron_receivers.predictivity import NeuronPredictivity
 
 class NeuronSpecialisation(NeuronPredictivity):
     def __init__(self, path_expert_indx, T, n_layers):
@@ -99,68 +82,3 @@ class NeuronSpecialisation(NeuronPredictivity):
         # save test image
         out.save('test_images/test_image_expert_removal.png')
         self.gates = []
-
-def remove_experts(adj_prompts, model, neuron_receiver, args, val=False):
-    iter = 0
-    for ann_adj in adj_prompts:
-        if iter >= 2 and args.dbg:
-            break
-        print("text: ", ann_adj)
-        # fix seed
-        torch.manual_seed(0)
-        np.random.seed(0) 
-        # run model for the original text
-        out = model(ann_adj).images[0]
-
-        neuron_receiver.reset_time_layer()
-        out_adj, pred_adj = neuron_receiver.observe_activation(model, ann_adj)
-        # save images
-        prefix = args.modularity['remove_expert_path'] if not val else args.modularity['remove_expert_path_val']
-        out.save(os.path.join(prefix, f'img_{iter}.jpg'))
-        out_adj.save(os.path.join(prefix, f'img_{iter}_adj.jpg'))
-        iter += 1
-
-def main():
-    args = utils.Config('experiments/config.yaml', 'modularity')
-    args.configure('modularity')
-
-    # model 
-    model, num_geglu = utils.get_sd_model(args)
-    model = model.to(args.gpu)
-
-    # Neuron receiver with forward hooks
-    condition = args.modularity['condition']
-    path = args.modularity[f'skilled_experts_{condition}']
-    neuron_receiver = NeuronSpecialisation(path_expert_indx = path, T = args.timesteps, n_layers = args.n_layers)
-                                           
-    # Dataset from things.txt
-    # read things.txt
-    with open('modularity/things.txt', 'r') as f:
-        objects = f.readlines()
-    adjectives = args.modularity['adjective']
-    adj_prompts = [f'a {adjectives} {thing}' for thing in objects]
-
-    # COnvert FFns into moe
-    model = modify_ffn_to_experts(model, args)
-
-    if args.fine_tuned_unet is not None:
-        neuron_receiver.test(model, relu_condition=args.fine_tuned_unet is not None)
-        print("Neuron receiver test passed")
-    
-    # remove experts
-    remove_experts(adj_prompts, model, neuron_receiver, args)
-
-    # read val_dataset
-    with open(f'modularity/val_things_{adjectives}.txt') as f:
-        val_objects = f.readlines()
-    
-    val_base_prompts = [f'a {thing.strip()}' for thing in val_objects]
-    
-    # remove experts from val_dataset
-    remove_experts(val_base_prompts, model, neuron_receiver, args, val=True)
-
-    
-    
-
-if __name__ == "__main__":
-    main()

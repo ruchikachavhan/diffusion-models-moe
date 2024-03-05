@@ -20,11 +20,6 @@ def make_dirs(args):
         if not os.path.exists(args.res_path):
             os.makedirs(args.res_path)
 
-    # make image directory
-    if not os.path.exists(os.path.join(args.res_path, args.model_id)):
-        os.makedirs(os.path.join(args.res_path, args.model_id))
-        os.makedirs(os.path.join(args.res_path, args.model_id, 'moefication'))
-
     # make directory for model id
     if not os.path.exists(os.path.join(args.res_path, args.model_id, 'images')):
         os.makedirs(os.path.join(args.res_path, args.model_id, 'images'))
@@ -33,34 +28,41 @@ def make_dirs(args):
     if not os.path.exists(os.path.join(args.res_path, args.model_id, 'sparsity')):
         os.makedirs(os.path.join(args.res_path, args.model_id, 'sparsity'))
 
-    if not os.path.exists(args.moefication['img_save_path']):
-        os.makedirs(args.moefication['img_save_path'])
-    
-    topk_experts = args.moefication['topk_experts']
-    if not os.path.exists(os.path.join(args.save_path, f'moe_images_{topk_experts}')):
-        os.makedirs(os.path.join(args.save_path, f'moe_images_{topk_experts}'))
+    if args.moefication is not None:
+        # make image directory
+        if not os.path.exists(os.path.join(args.res_path, args.model_id)):
+            os.makedirs(os.path.join(args.res_path, args.model_id))
+            os.makedirs(os.path.join(args.res_path, args.model_id, 'moefication'))
 
-    
-    if not os.path.exists(os.path.join(args.res_path, args.model_id, 'modularity', args.modularity['adjective'])):
-        os.makedirs(os.path.join(args.res_path, args.model_id, 'modularity', args.modularity['adjective']))
 
-    if not os.path.exists(os.path.join(args.res_path, args.model_id, 'modularity', args.modularity['adjective'], 'images')):
-        os.makedirs(os.path.join(args.res_path, args.model_id, 'modularity', args.modularity['adjective'], 'images'))
+        if not os.path.exists(args.moefication['img_save_path']):
+            os.makedirs(args.moefication['img_save_path'])
+        
+        topk_experts = args.moefication['topk_experts']
+        if not os.path.exists(os.path.join(args.save_path, f'moe_images_{topk_experts}')):
+            os.makedirs(os.path.join(args.save_path, f'moe_images_{topk_experts}'))
+
+    if args.modularity is not None:
+        if not os.path.exists(os.path.join(args.res_path, args.model_id, 'modularity', args.modularity['adjective'])):
+            os.makedirs(os.path.join(args.res_path, args.model_id, 'modularity', args.modularity['adjective']))
+
+        if not os.path.exists(os.path.join(args.res_path, args.model_id, 'modularity', args.modularity['adjective'], 'images')):
+            os.makedirs(os.path.join(args.res_path, args.model_id, 'modularity', args.modularity['adjective'], 'images'))
+
+        if not os.path.exists(args.modularity['skill_expert_path']):
+            os.makedirs(args.modularity['skill_expert_path'])
+            os.makedirs(args.modularity['remove_expert_path'])
+            os.makedirs(args.modularity['remove_expert_path_val'])
+        
+        if not os.path.exists(args.modularity['img_save_path']):
+            os.makedirs(args.modularity['img_save_path'])
+        
+        if not os.path.exists(args.modularity['plots']):
+            os.makedirs(args.modularity['plots'])
+        
+        if not os.path.exists(args.modularity['hidden_states_path']):
+            os.makedirs(args.modularity['hidden_states_path'])
     
-    ratio = args.modularity['skilled_neuron_ratio']
-    if not os.path.exists(os.path.join(args.res_path, args.model_id, 'modularity', args.modularity['adjective'], f'skilled_neuron_ratio_{ratio}')):
-        os.makedirs(os.path.join(args.res_path, args.model_id, 'modularity', args.modularity['adjective'], f'skilled_neuron_ratio_{ratio}'))
-    
-    if not os.path.exists(args.modularity['remove_expert_path']):
-        os.makedirs(args.modularity['remove_expert_path'])
-    if not os.path.exists(args.modularity['remove_expert_path_val']):
-        os.makedirs(args.modularity['remove_expert_path_val'])
-    if not os.path.exists(args.modularity['skill_expert_path']):
-        os.makedirs(args.modularity['skill_expert_path'])
-    if not os.path.exists(args.modularity['skilled_experts_t_test']):
-        os.makedirs(args.modularity['skilled_experts_t_test'])
-    if not os.path.exists(args.modularity['skilled_experts_moefy']):
-        os.makedirs(args.modularity['skilled_experts_moefy'])
 
 def get_sd_model(args):
 
@@ -113,30 +115,26 @@ class Config:
             self.res_path = os.path.join(self.res_path, 'baseline')
         self.save_path = os.path.join(self.res_path, self.model_id, exp_name)
 
-    def configure(self, exp_name):      
+    def configure(self, exp_name):     
+
+        # Folders fo modulairty experiments 
         if exp_name == 'modularity':  
             self.save_path = os.path.join(self.res_path, self.model_id, exp_name, self.modularity['adjective'])
-        ratio = self.modularity['skilled_neuron_ratio']
-        self.modularity['skill_expert_path'] = os.path.join(self.res_path, self.model_id, exp_name, self.modularity['adjective'], f'skilled_neuron_ratio_{ratio}')
-        self.modularity['skilled_experts_t_test'] = os.path.join(self.res_path, self.model_id, exp_name, self.modularity['adjective'], f'skilled_experts_t_test')
-        self.modularity['skilled_experts_moefy'] = os.path.join(self.res_path, self.model_id, exp_name, self.modularity['adjective'], f'skilled_experts_moefy')
-        self.modularity['img_save_path'] = os.path.join(self.save_path, 'images')
-        if self.modularity['condition'] == 'greater':
-            self.modularity['remove_expert_path'] = os.path.join(self.modularity[f'skilled_neuron_ratio_{ratio}'], 'remove_experts')
-            self.modularity['remove_expert_path_val'] = os.path.join(self.modularity[f'skilled_neuron_ratio_{ratio}'], 'remove_experts_val')
-        elif self.modularity['condition'] == 't_test':
-            self.modularity['remove_expert_path'] = os.path.join(self.modularity['skilled_experts_t_test'], 'remove_experts')
-            self.modularity['remove_expert_path_val'] = os.path.join(self.modularity['skilled_experts_t_test'], 'remove_experts_val')
-        elif self.modularity['condition'] == 'moefy':
-            self.modularity['remove_expert_path'] = os.path.join(self.modularity['skilled_experts_moefy'], 'remove_experts')
-            self.modularity['remove_expert_path_val'] = os.path.join(self.modularity['skilled_experts_moefy'], 'remove_experts_val')
         
-    
-        topk_experts = self.moefication['topk_experts']
-        self.moefication['img_save_path'] = os.path.join(self.save_path, f'moe_images_{topk_experts}')
-        
-        print("Saving images at", {self.moefication['img_save_path']})            
+        if self.modularity is not None:
+            self.modularity['img_save_path'] = os.path.join(self.save_path, 'images')
+            self.modularity['hidden_states_path'] = os.path.join(self.save_path, 'hidden_states')
+            ratio = self.modularity['condition']['skill_ratio']
+            condition = self.modularity['condition']['name'] 
+            self.modularity['skill_expert_path'] = os.path.join(self.res_path, self.model_id, exp_name, self.modularity['adjective'], f'skilled_neuron_{condition}_{ratio}')
+            self.modularity['remove_expert_path'] = os.path.join(self.modularity['skill_expert_path'], 'remove_experts')
+            self.modularity['remove_expert_path_val'] = os.path.join(self.modularity['skill_expert_path'], 'remove_experts_val')
+            self.modularity['plots'] = os.path.join(self.modularity['skill_expert_path'], 'plots')
 
+        if self.moefication is not None:
+            topk_experts = self.moefication['topk_experts']
+            self.moefication['img_save_path'] = os.path.join(self.save_path, f'moe_images_{topk_experts}')
+        
         # set experiment folders
         make_dirs(self)
         
