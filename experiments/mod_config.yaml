@@ -7,8 +7,9 @@ modularity:
   adjective: 'white'
   margin: 0.05
   condition:
-    name: 't_test'
+    name: 'greater'
     skill_ratio: 0.5
+  bounding_box: true
 dataset:
   path: '../COCO-vqa'
 inference:
@@ -18,7 +19,7 @@ res_path: 'results/stable-diffusion'
 model_id: 'runwayml/stable-diffusion-v1-5'
 n_layers: 16
 fine_tuned_unet: '../diffusers/examples/text_to_image/relufied-stable-diffusion-v1-5/checkpoint-14000/'
-gpu: 3
+gpu: 2
 timesteps: 51
 dbg: false
   

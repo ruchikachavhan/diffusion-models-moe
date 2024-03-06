@@ -116,13 +116,18 @@ def main():
                 if num_elements_zero >= 3:
                     print(f"No elements for expert {expt_idx} at timestep {t} and ffn {ffn_name}")
                     continue
+                
+                # frequency of selecting by the concept prompt and not base prompt
+                vals = table[1, 0]
+                print(vals)
+
                 # check if elements 
                 # calculate the chi square value
-                chi2, p, dof, ex = stats.chi2_contingency(contingency_table[t][ffn_name][expt_idx])
-                print(f"Chi2 value: {chi2}, p value: {p}")
-                # if p value is less than 0.05, then the expert is skilled
-                if p < 0.05:
-                    print(f"Expert {expt_idx} is skilled at timestep {t} and ffn {ffn_name}")
+                # chi2, p, dof, ex = stats.chi2_contingency(contingency_table[t][ffn_name][expt_idx])
+                # print(f"Chi2 value: {chi2}, p value: {p}")
+                # # if p value is less than 0.05, then the expert is skilled
+                # if p < 0.05:
+                #     print(f"Expert {expt_idx} is skilled at timestep {t} and ffn {ffn_name}")
 
 
 if __name__ == "__main__":

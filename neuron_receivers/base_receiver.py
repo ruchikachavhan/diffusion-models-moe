@@ -18,7 +18,7 @@ class BaseNeuronReceiver:
         for hook in hooks:
             hook.remove()
     
-    def observe_activation(self, model, ann):
+    def observe_activation(self, model, ann, bboxes=None):
         hooks = []
         # reset the gates
         self.gates = []
@@ -30,6 +30,8 @@ class BaseNeuronReceiver:
                 hook = module.register_forward_hook(self.hook_fn)
                 num_modules += 1
                 hooks.append(hook)
+                if bboxes is not None:
+                    module.bounding_box = bboxes[name + '.proj.weight']
 
         # forward pass
         #  fix seed to get the same output for every run
