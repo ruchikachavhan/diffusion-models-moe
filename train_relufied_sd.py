@@ -18,6 +18,7 @@ import logging
 import math
 import os
 import random
+import yaml
 import shutil
 from pathlib import Path
 from PIL import Image
@@ -50,6 +51,9 @@ from diffusers.utils.hub_utils import load_or_create_model_card, populate_model_
 from diffusers.utils.import_utils import is_xformers_available
 from diffusers.utils.torch_utils import is_compiled_module
 from diffusers.models.activations import GEGLU
+
+# For MIMIC Dataset
+from get_dataset_mimic_cxr import MimicCXRDataset
 
 if is_wandb_available():
     import wandb
@@ -522,6 +526,48 @@ def parse_args():
 
     return args
 
+def prepare_mimic_dataset(args, tokenizer):
+
+    # Defining Constants
+    dataset_split_seed = 42
+    data_size_ratio = 1.0
+
+    # Import CSV path from the YAML file
+    print("Loading files for MIMIC dataset")
+    with open("data_config.yaml") as file:
+        yaml_data = yaml.safe_load(file)
+
+    train_data_path = yaml_data["train_csv"]
+    val_data_path = yaml_data["val_csv"]
+    test_data_path = yaml_data["test_csv"]
+
+    images_path_train = Path(yaml_data["images_path_train"])
+
+    # Prepare transformers here
+    # Note: These are the same transforms being used for other HF datasets below
+    print("Preparing transforms")
+    train_transforms = transforms.Compose(
+        [
+            transforms.Resize(args.resolution, interpolation=transforms.InterpolationMode.BILINEAR),
+            transforms.CenterCrop(args.resolution) if args.center_crop else transforms.RandomCrop(args.resolution),
+            transforms.RandomHorizontalFlip() if args.random_flip else transforms.Lambda(lambda x: x),
+            transforms.ToTensor(),
+            transforms.Normalize([0.5], [0.5]),
+        ]
+    )
+
+    print("Preparing MIMIC Dataset")
+    train_dataset = MimicCXRDataset(
+        csv_file=train_data_path,
+        images_dir=images_path_train,
+        tokenizer=tokenizer,
+        transform=train_transforms,
+        seed=dataset_split_seed,
+        dataset_size_ratio=data_size_ratio,
+        use_real_images=True,
+    )
+
+    return train_dataset
 
 def main():
     args = parse_args()
@@ -725,13 +771,17 @@ def main():
     # In distributed training, the load_dataset function guarantees that only one local process can concurrently
     # download the dataset.
     if args.dataset_name is not None:
-        # Downloading and loading a dataset from the hub.
-        dataset = load_dataset(
-            args.dataset_name,
-            args.dataset_config_name,
-            cache_dir=args.cache_dir,
-            data_dir=args.train_data_dir,
-        )
+        if(args.dataset_name == 'mimic'):
+            # Dataset present locally, load from there
+            train_dataset = prepare_mimic_dataset(args, tokenizer)
+        else:
+            # Downloading and loading a dataset from the hub.
+            dataset = load_dataset(
+                args.dataset_name,
+                args.dataset_config_name,
+                cache_dir=args.cache_dir,
+                data_dir=args.train_data_dir,
+            )
     else:
         data_files = {}
         if args.train_data_dir is not None:
@@ -746,83 +796,96 @@ def main():
 
     # Preprocessing the datasets.
     # We need to tokenize inputs and targets.
-    column_names = dataset["train"].column_names
 
-    # 6. Get the column names for input/target.
-    dataset_columns = DATASET_NAME_MAPPING.get(args.dataset_name, None)
-    if args.image_column is None:
-        image_column = dataset_columns[0] if dataset_columns is not None else column_names[0]
-    else:
-        image_column = args.image_column
-        if image_column not in column_names:
-            raise ValueError(
-                f"--image_column' value '{args.image_column}' needs to be one of: {', '.join(column_names)}"
-            )
-    if args.caption_column is None:
-        caption_column = dataset_columns[1] if dataset_columns is not None else column_names[1]
-    else:
-        caption_column = args.caption_column
-        if caption_column not in column_names:
-            raise ValueError(
-                f"--caption_column' value '{args.caption_column}' needs to be one of: {', '.join(column_names)}"
-            )
+    # Note: We do not need to run this for MIMIC dataset
+    if(args.dataset != 'mimic'):
+        column_names = dataset["train"].column_names
 
-    # Preprocessing the datasets.
-    # We need to tokenize input captions and transform the images.
-    def tokenize_captions(examples, is_train=True):
-        captions = []
-        for caption in examples[caption_column]:
-            if isinstance(caption, str):
-                captions.append(caption)
-            elif isinstance(caption, (list, np.ndarray)):
-                # take a random caption if there are multiple
-                captions.append(random.choice(caption) if is_train else caption[0])
-            else:
+        # 6. Get the column names for input/target.
+        dataset_columns = DATASET_NAME_MAPPING.get(args.dataset_name, None)
+        if args.image_column is None:
+            image_column = dataset_columns[0] if dataset_columns is not None else column_names[0]
+        else:
+            image_column = args.image_column
+            if image_column not in column_names:
                 raise ValueError(
-                    f"Caption column `{caption_column}` should contain either strings or lists of strings."
+                    f"--image_column' value '{args.image_column}' needs to be one of: {', '.join(column_names)}"
                 )
-        inputs = tokenizer(
-            captions, max_length=tokenizer.model_max_length, padding="max_length", truncation=True, return_tensors="pt"
+        if args.caption_column is None:
+            caption_column = dataset_columns[1] if dataset_columns is not None else column_names[1]
+        else:
+            caption_column = args.caption_column
+            if caption_column not in column_names:
+                raise ValueError(
+                    f"--caption_column' value '{args.caption_column}' needs to be one of: {', '.join(column_names)}"
+                )   
+
+    # Note: We do not need to run this for MIMIC dataset
+    if(args.dataset != 'mimic'):
+        # Preprocessing the datasets.
+        # We need to tokenize input captions and transform the images.
+        def tokenize_captions(examples, is_train=True):
+            captions = []
+            for caption in examples[caption_column]:
+                if isinstance(caption, str):
+                    captions.append(caption)
+                elif isinstance(caption, (list, np.ndarray)):
+                    # take a random caption if there are multiple
+                    captions.append(random.choice(caption) if is_train else caption[0])
+                else:
+                    raise ValueError(
+                        f"Caption column `{caption_column}` should contain either strings or lists of strings."
+                    )
+            inputs = tokenizer(
+                captions, max_length=tokenizer.model_max_length, padding="max_length", truncation=True, return_tensors="pt"
+            )
+            return inputs.input_ids
+
+        # Preprocessing the datasets.
+        train_transforms = transforms.Compose(
+            [
+                transforms.Resize(args.resolution, interpolation=transforms.InterpolationMode.BILINEAR),
+                transforms.CenterCrop(args.resolution) if args.center_crop else transforms.RandomCrop(args.resolution),
+                transforms.RandomHorizontalFlip() if args.random_flip else transforms.Lambda(lambda x: x),
+                transforms.ToTensor(),
+                transforms.Normalize([0.5], [0.5]),
+            ]
         )
-        return inputs.input_ids
 
-    # Preprocessing the datasets.
-    train_transforms = transforms.Compose(
-        [
-            transforms.Resize(args.resolution, interpolation=transforms.InterpolationMode.BILINEAR),
-            transforms.CenterCrop(args.resolution) if args.center_crop else transforms.RandomCrop(args.resolution),
-            transforms.RandomHorizontalFlip() if args.random_flip else transforms.Lambda(lambda x: x),
-            transforms.ToTensor(),
-            transforms.Normalize([0.5], [0.5]),
-        ]
-    )
+        def preprocess_train(examples):
+            images = [Image.open(requests.get(image, stream=True).raw).convert("RGB") for image in examples[image_column]]
+            examples["pixel_values"] = [train_transforms(image) for image in images]
+            examples["input_ids"] = tokenize_captions(examples)
+            return examples
 
-    def preprocess_train(examples):
-        images = [Image.open(requests.get(image, stream=True).raw).convert("RGB") for image in examples[image_column]]
-        examples["pixel_values"] = [train_transforms(image) for image in images]
-        examples["input_ids"] = tokenize_captions(examples)
-        return examples
+        with accelerator.main_process_first():
+            if args.max_train_samples is not None:
+                dataset["train"] = dataset["train"].shuffle(seed=args.seed).select(range(args.max_train_samples))
+            # Set the training transforms
+            train_dataset = dataset["train"].with_transform(preprocess_train)
 
-    with accelerator.main_process_first():
-        if args.max_train_samples is not None:
-            dataset["train"] = dataset["train"].shuffle(seed=args.seed).select(range(args.max_train_samples))
-        # Set the training transforms
-        train_dataset = dataset["train"].with_transform(preprocess_train)
+        def collate_fn(examples):
+            pixel_values = torch.stack([example["pixel_values"] for example in examples])
+            pixel_values = pixel_values.to(memory_format=torch.contiguous_format).float()
+            input_ids = torch.stack([example["input_ids"] for example in examples])
+            return {"pixel_values": pixel_values, "input_ids": input_ids}
 
-    def collate_fn(examples):
-        pixel_values = torch.stack([example["pixel_values"] for example in examples])
-        pixel_values = pixel_values.to(memory_format=torch.contiguous_format).float()
-        input_ids = torch.stack([example["input_ids"] for example in examples])
-        return {"pixel_values": pixel_values, "input_ids": input_ids}
-
-    # DataLoaders creation:
-    train_dataloader = torch.utils.data.DataLoader(
-        train_dataset,
-        shuffle=True,
-        collate_fn=collate_fn,
-        batch_size=args.train_batch_size,
-        num_workers=args.dataloader_num_workers,
-    )
+        # DataLoaders creation:
+        train_dataloader = torch.utils.data.DataLoader(
+            train_dataset,
+            shuffle=True,
+            collate_fn=collate_fn,
+            batch_size=args.train_batch_size,
+            num_workers=args.dataloader_num_workers,
+        )
+    else:
+        # Create a separate dataloader for the mimic dataset
+        train_dataloader = torch.utils.data.DataLoader(
+            train_dataset,
+            shuffle=True,
+            batch_size=args.train_batch_size,
+            num_workers=args.dataloader_num_workers,
+        )
 
     # Scheduler and math around the number of training steps.
     overrode_max_train_steps = False
