@@ -18,8 +18,8 @@ def main():
     model = model.to(args.gpu)
 
     # Neuron receiver with forward hooks to measure predictivity
-    neuron_pred_base = SaveStates(T=args.timesteps, n_layers=num_geglu)
-    neuron_pred_adj = SaveStates(T=args.timesteps, n_layers=num_geglu)
+    neuron_pred_base = SaveStates(seed=args.seed, T=args.timesteps, n_layers=num_geglu)
+    neuron_pred_adj = SaveStates(seed=args.seed, T=args.timesteps, n_layers=num_geglu)
 
     # Dataset from things.txt
     # read things.txt

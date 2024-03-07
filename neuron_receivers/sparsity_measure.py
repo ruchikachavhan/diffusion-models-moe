@@ -7,8 +7,8 @@ class SparsityMeasure(BaseNeuronReceiver):
     '''
     Measure sparsity of the model
     '''
-    def __init__(self):
-        super(SparsityMeasure, self).__init__()
+    def __init__(self, seed):
+        super(SparsityMeasure, self).__init__(seed)
 
     def hook_fn(self, module, input, output):
         # save the out

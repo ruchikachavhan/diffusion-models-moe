@@ -8,6 +8,7 @@ from neuron_receivers import SparsityMeasure
 
 def main():
     args = Config('experiments/config.yaml', 'sparsity')
+    args.configure('sparsity')
     # Model
     model, num_geglu = get_sd_model(args)
     model = model.to(args.gpu)
@@ -15,7 +16,7 @@ def main():
     imgs, anns = coco_dataset(args.dataset['path'], 'val', args.inference['num_images'])
 
     # Neuron receiver to store gates for every sample
-    neuron_receiver = SparsityMeasure()
+    neuron_receiver = SparsityMeasure(args.seed)
     if args.fine_tuned_unet is not None:
         neuron_receiver.test(model)
         print("Neuron receiver test passed")

@@ -13,12 +13,8 @@ def make_dirs(args):
     if not os.path.exists('test_images'):
         os.makedirs('test_images')
 
-    if args.fine_tuned_unet is not None:
-        if not os.path.exists(args.res_path):
-            os.makedirs(args.res_path)
-    else:
-        if not os.path.exists(args.res_path):
-            os.makedirs(args.res_path)
+    if not os.path.exists(args.res_path):
+        os.makedirs(args.res_path)
 
     # make directory for model id
     if not os.path.exists(os.path.join(args.res_path, args.model_id, 'images')):
@@ -107,12 +103,16 @@ class Config:
         self.exp_name = exp_name
         for key, value in config.items():
             setattr(self, key, value)
+        
+        if self.seed!=0:
+            self.res_path = f'results_seed_{self.seed}' + '/' + self.res_path.split('/')[1]
     
         # change result directory
         if self.fine_tuned_unet is not None:
             self.res_path = os.path.join(self.res_path, 'fine-tuned-relu')
         else:
             self.res_path = os.path.join(self.res_path, 'baseline')
+        print("Saving results to", self.res_path)
         self.save_path = os.path.join(self.res_path, self.model_id, exp_name)
 
     def configure(self, exp_name):     

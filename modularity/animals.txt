@@ -1,0 +1,13 @@
+cat
+dog
+mouse
+tiger
+bear
+rabbit
+bat
+horse
+bird
+flower
+chicken
+duck
+

@@ -17,11 +17,11 @@ def main():
 
     # Neuron receiver with forward hooks to measure predictivity
     if args.modularity['bounding_box']:
-        neuron_pred_base = NeuronPredictivityBB(T=args.timesteps, n_layers=num_geglu)
-        neuron_pred_adj = NeuronPredictivityBB(T=args.timesteps, n_layers=num_geglu)
+        neuron_pred_base = NeuronPredictivityBB(args.seed, args.timesteps, num_geglu)
+        neuron_pred_adj = NeuronPredictivityBB(args.seed, args.timesteps, num_geglu)
     else:
-        neuron_pred_base = NeuronPredictivity(T=args.timesteps, n_layers=num_geglu)
-        neuron_pred_adj = NeuronPredictivity(T=args.timesteps, n_layers=num_geglu)
+        neuron_pred_base = NeuronPredictivity(args.seed, args.timesteps, num_geglu)
+        neuron_pred_adj = NeuronPredictivity(args.seed, args.timesteps, num_geglu)
 
     # Test the model
     if args.fine_tuned_unet is not None:
@@ -42,8 +42,10 @@ def main():
         # read bounding box coordinates
         with open(os.path.join(args.save_path, 'bb_coordinates_layer_adj.json')) as f:
             bb_coordinates_layer_adj = json.load(f)
+            print(bb_coordinates_layer_adj.keys())
         with open(os.path.join(args.save_path, 'bb_coordinates_layer_base.json')) as f:
             bb_coordinates_layer_base = json.load(f)
+            print(bb_coordinates_layer_base.keys())
 
     iter = 0
     for ann, ann_adj in tqdm.tqdm(zip(base_prompts, adj_prompts)):

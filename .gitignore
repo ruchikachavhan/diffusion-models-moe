@@ -1,4 +1,5 @@
 results/*
+results_seed_1/*
 *.png
 __pycache__/
 *.jpg

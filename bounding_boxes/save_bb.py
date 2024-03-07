@@ -75,8 +75,8 @@ def save_bounding_box(model, BBModel, tokenizer, propmts, args, neuron_receiver,
     for ann in propmts:
         print("text: ", ann)
         # fix seed
-        torch.manual_seed(0)
-        np.random.seed(0) 
+        torch.manual_seed(args.seed)
+        np.random.seed(args.seed)
         # run model for the original text
         out, _ = neuron_receiver.observe_activation(model, ann)
 
@@ -107,7 +107,7 @@ def main():
     # Boundin box model
     BBModel, tokenizer = bb_model(args)
 
-    neuron_receiver = SparsityMeasure()
+    neuron_receiver = SparsityMeasure(args.seed)
 
     # Dataset from things.txt
     # read things.txt

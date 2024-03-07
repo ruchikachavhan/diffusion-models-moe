@@ -7,8 +7,8 @@ from neuron_receivers.base_receiver import BaseNeuronReceiver
 from neuron_receivers.predictivity import NeuronPredictivity
 
 class NeuronSpecialisation(NeuronPredictivity):
-    def __init__(self, path_expert_indx, T, n_layers):
-        super(NeuronSpecialisation, self).__init__(T, n_layers)
+    def __init__(self, seed, path_expert_indx, T, n_layers):
+        super(NeuronSpecialisation, self).__init__(seed, T, n_layers)
         self.expert_indices = {}
         for i in range(0, T):
             self.expert_indices[i] = {}
@@ -54,8 +54,8 @@ class NeuronSpecialisation(NeuronPredictivity):
     
     def test(self, model, ann = 'an white cat', relu_condition = False):
         # hook the model
-        torch.manual_seed(0)
-        np.random.seed(0)
+        torch.manual_seed(self.seed)
+        np.random.seed(self.seed)
         nochange_out = model(ann).images[0]
         nochange_out.save('test_images/test_image_all_expert.png')
         hooks = []
@@ -68,8 +68,8 @@ class NeuronSpecialisation(NeuronPredictivity):
 
         # forward pass
         #  fix seed to get the same output
-        torch.manual_seed(0)
-        np.random.seed(0)
+        torch.manual_seed(self.seed)
+        np.random.seed(self.seed)
         out = model(ann).images[0]
 
         # remove the hook

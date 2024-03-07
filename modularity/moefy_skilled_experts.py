@@ -13,10 +13,11 @@ from collections import Counter
 from greater import load_expert_clusters
 sys.path.append('moefication')
 from helper import modify_ffn_to_experts
-from neuron_receivers import FrequencyMeasure
+from neuron_receivers import GetExperts
 sys.path.append(os.getcwd())
 import utils
 from scipy import stats
+from collections import Counter
 
 
 def update_table(table, freq_base, freq_adj):
@@ -65,17 +66,25 @@ def main():
     adjectives = args.modularity['adjective']
     adj_prompts = [f'a {adjectives} {thing}' for thing in things]
 
+    if args.modularity['bounding_box']:
+        # read bounding box coordinates
+        with open(os.path.join(args.save_path, 'bb_coordinates_layer_adj.json')) as f:
+            bb_coordinates_layer_adj = json.load(f)
+            print(bb_coordinates_layer_adj.keys())
+        with open(os.path.join(args.save_path, 'bb_coordinates_layer_base.json')) as f:
+            bb_coordinates_layer_base = json.load(f)
+
     # Neuron receiver with forward hooks to measure predictivity
-    freq_counter = FrequencyMeasure(args.timesteps, args.n_layers, num_experts_per_ffn, ffn_names_list)
+    freq_counter = GetExperts(args.seed, args.timesteps, args.n_layers, num_experts_per_ffn, ffn_names_list)
     iter = 0
 
-    contingency_table = {}
+    expert_diff, union_counter = {}, {}
     for t in range(args.timesteps):
-        contingency_table[t] = {}
-        for ffn_name in ffn_names_list:
-            contingency_table[t][ffn_name] = {}
-            for expt_idx in range(max(expert_clusters[ffn_name]) + 1):
-                contingency_table[t][ffn_name][expt_idx] = np.zeros((2, 2))
+        expert_diff[t] = {}
+        union_counter[t] = {}
+        for l in range(args.n_layers):
+            expert_diff[t][l] = []
+            union_counter[t][l] = []
 
     for ann, ann_adj in tqdm.tqdm(zip(base_prompts, adj_prompts)):
         if iter >= 5 and args.dbg:
@@ -83,51 +92,51 @@ def main():
         print("text: ", ann, ann_adj)
 
         freq_counter.reset()
-        out, _ = freq_counter.observe_activation(model, ann)
-        label_counter = freq_counter.label_counter
-
+        out, _ = freq_counter.observe_activation(model, ann, bboxes=bb_coordinates_layer_base[ann] if args.modularity['bounding_box'] else None)
+        # save image
+        out.save(f'test_images/test_image_base.png')
+        label_counter = freq_counter.label_counter.copy()
+        expert_score = freq_counter.score_tracker.copy()
+            
         freq_counter.reset()
-        out_adj, _ = freq_counter.observe_activation(model, ann_adj)
-        label_counter_adj = freq_counter.label_counter
+        out_adj, _ = freq_counter.observe_activation(model, ann_adj, bboxes=bb_coordinates_layer_adj[ann_adj+'\n'] if args.modularity['bounding_box'] else None)
+        # save image
+        out_adj.save(f'test_images/test_image_adj.png')
+        label_counter_adj = freq_counter.label_counter.copy()
+        expert_score_adj = freq_counter.score_tracker.copy()
 
-        # update the contigency tables for each timestep
-        for t in range(args.timesteps):
-            for ffn_name in ffn_names_list:
-                expert_indices = expert_clusters[ffn_name]
-                for expt_idx in range(max(expert_indices) + 1):
-                    # frequency of expert in base prompt and adj prompt
-                    # For every sampe, frequency counter returns the average number of times expert was selected by all tokens. 
-                    # If more than 50% of the tokens in the latent space select the expert, then the expert is considered skilled
-                    freq_base = check_condition(label_counter[t][ffn_names_list.index(ffn_name)][expt_idx], args)
-                    freq_adj = check_condition(label_counter_adj[t][ffn_names_list.index(ffn_name)][expt_idx], args)
-                    # update the contingency table
-                    contingency_table[t][ffn_name][expt_idx] = update_table(contingency_table[t][ffn_name][expt_idx], freq_base, freq_adj)
-                      
         iter += 1
 
-    # print the contingency tables
-    for t in range(args.timesteps):
-        for ffn_name in ffn_names_list:
-            for expt_idx in range(max(expert_clusters[ffn_name]) + 1):
-                print(f"Contingency table for timestep {t}, ffn {ffn_name}, expert {expt_idx}")
-                print(contingency_table[t][ffn_name][expt_idx])
-                table = contingency_table[t][ffn_name][expt_idx]
-                num_elements_zero = (table == 0).sum()
-                if num_elements_zero >= 3:
-                    print(f"No elements for expert {expt_idx} at timestep {t} and ffn {ffn_name}")
-                    continue
-                
-                # frequency of selecting by the concept prompt and not base prompt
-                vals = table[1, 0]
-                print(vals)
+        # for each timestep and layer, select top 70% most frequently selected experts
+        # this corresponds to selecting experts that have been chosen by more than 70% of the tokens
+        for t in range(args.timesteps):
+            for l in range(args.n_layers):
+                # select the top 70% most frequently selected experts
+                expert_base = label_counter[t][l]
+                expert_adj = label_counter_adj[t][l]
+                # symmetric set difference
+                diff = list(set(expert_adj) - set(expert_base))
+                expert_diff[t][l] += diff
+                # count how many times an expert occured in the union of the two sets
+                union_counter[t][l] = Counter(expert_diff[t][l])
 
-                # check if elements 
-                # calculate the chi square value
-                # chi2, p, dof, ex = stats.chi2_contingency(contingency_table[t][ffn_name][expt_idx])
-                # print(f"Chi2 value: {chi2}, p value: {p}")
-                # # if p value is less than 0.05, then the expert is skilled
-                # if p < 0.05:
-                #     print(f"Expert {expt_idx} is skilled at timestep {t} and ffn {ffn_name}")
+                  
+    # based on frequency of that expert in the union, select the expert
+    for t in range(args.timesteps):
+        for l in range(args.n_layers): 
+            # sort the counter keys based on values
+            union_counter[t][l] = dict(sorted(union_counter[t][l].items(), key=lambda item: item[1], reverse=True))
+            # save top 80% most frequently selected experts
+            skilled_experts = list(union_counter[t][l].keys())[:int(len(union_counter[t][l]) * 0.5)]
+            skilled_experts = [int(expert) for expert in skilled_experts]
+            print(f'timestep: {t}, layer: {l}, skilled experts: {skilled_experts}')
+            with open(os.path.join(args.modularity['skill_expert_path'], f'timestep_{t}_layer_{l}.json'), 'w') as f:
+                json.dump(skilled_experts, f)
+
+
+        
+
+        iter += 1
 
 
 if __name__ == "__main__":

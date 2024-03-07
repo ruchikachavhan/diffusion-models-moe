@@ -6,8 +6,8 @@ from neuron_receivers.predictivity import NeuronPredictivity
 
 # class to save hidden states 
 class SaveStates(NeuronPredictivity):
-    def __init__(self, T, n_layers):
-        super(SaveStates, self).__init__(T, n_layers)
+    def __init__(self, seed, T, n_layers):
+        super(SaveStates, self).__init__(seed, T, n_layers)
         self.T = T
         self.n_layers = n_layers
         self.hidden_states = {}

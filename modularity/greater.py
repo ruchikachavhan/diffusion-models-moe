@@ -59,6 +59,9 @@ def main():
             for ext_idx in range(num_experts):
                 # get neurons that belong to this expert
                 neurons = torch.tensor(expert_clusters[param_names[i]]) == ext_idx
+                avg_pred_expert = base_avg[neurons].mean()
+                avg_pred_expert_adj = adj_avg[neurons].mean()
+                print(f'Expert {ext_idx} avg predictivity: {avg_pred_expert} -> {avg_pred_expert_adj}')
                 # calculate the average predictivity for this expert
                 is_expert_skilled = is_greater[neurons]                 
                 avg_exp_pred.append(np.mean(is_expert_skilled) * 100.0)

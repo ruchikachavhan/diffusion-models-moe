@@ -6,7 +6,8 @@ class BaseNeuronReceiver:
     '''
     This is the base class for storing and changing activation functions
     '''
-    def __init__(self):
+    def __init__(self, seed = 0):
+        self.seed = seed
         self.gates = []
         self.hidden_states = []
     
@@ -32,11 +33,13 @@ class BaseNeuronReceiver:
                 hooks.append(hook)
                 if bboxes is not None:
                     module.bounding_box = bboxes[name + '.proj.weight']
+                else:
+                    module.bounding_box = None
 
         # forward pass
         #  fix seed to get the same output for every run
-        torch.manual_seed(0)
-        np.random.seed(0)
+        torch.manual_seed(self.seed)
+        np.random.seed(self.seed)
         out = model(ann).images[0]
 
         # remove the hook

@@ -35,7 +35,7 @@ def main():
     # Eval dataset
     imgs, anns = utils.coco_dataset(args.dataset['path'], 'val', args.inference['num_images'])
 
-    neuron_receiver = FrequencyMeasure(args.timesteps, args.n_layers, num_experts_per_ffn, ffn_names_list)
+    neuron_receiver = FrequencyMeasure(args.seed, args.timesteps, args.n_layers, num_experts_per_ffn, ffn_names_list)
 
     iter = 0
     
@@ -51,8 +51,8 @@ def main():
             break
         print("text: ", ann)
         # fix seed
-        torch.manual_seed(0)
-        np.random.seed(0)        
+        torch.manual_seed(args.seed)
+        np.random.seed(args.seed)    
         neuron_receiver.reset()
         out_moe, _ = neuron_receiver.observe_activation(model, ann)
         label_counter = neuron_receiver.label_counter

@@ -7,8 +7,8 @@ import utils
 import cv2
 
 class NeuronPredictivityBB(BaseNeuronReceiver):
-    def __init__(self, T, n_layers):
-        super(NeuronPredictivityBB, self).__init__()
+    def __init__(self, seed, T, n_layers):
+        super(NeuronPredictivityBB, self).__init__(seed)
         self.T = T
         self.n_layers = n_layers
         self.predictivity = utils.StatMeter(T, n_layers)

@@ -16,9 +16,9 @@ def remove_experts(adj_prompts, model, neuron_receiver, args, val=False):
         if iter >= 2 and args.dbg:
             break
         print("text: ", ann_adj)
-        # fix seed
-        torch.manual_seed(0)
-        np.random.seed(0) 
+        # fix seeed
+        torch.manual_seed(args.seed)
+        np.random.seed(args.seed)
         # run model for the original text
         out = model(ann_adj).images[0]
 
@@ -39,7 +39,7 @@ def main():
     model = model.to(args.gpu)
 
     # Neuron receiver with forward hooks
-    neuron_receiver = NeuronSpecialisation(path_expert_indx = args.modularity['skill_expert_path'], T=args.timesteps, n_layers=num_geglu)
+    neuron_receiver = NeuronSpecialisation(seed=args.seed, path_expert_indx = args.modularity['skill_expert_path'], T=args.timesteps, n_layers=num_geglu)
                                            
     # Dataset from things.txt
     # read things.txt

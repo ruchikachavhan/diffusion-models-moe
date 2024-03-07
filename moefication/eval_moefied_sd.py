@@ -38,7 +38,7 @@ def main():
     imgs, anns = utils.coco_dataset(args.dataset['path'], 'val', args.inference['num_images'])
 
     # MOEFIER
-    moefier = MOEFy()
+    moefier = MOEFy(seed = args.seed)
     moefier.test(model, relu_condition=args.fine_tuned_unet is not None)
     
     orig_imgs, non_moe_imgs, moe_imgs = [], [], []
@@ -50,8 +50,8 @@ def main():
             break
         print("text: ", ann)
         # fix seed
-        torch.manual_seed(0)
-        np.random.seed(0)
+        torch.manual_seed(args.seed)
+        np.random.seed(args.seed)
         # Without MOEfication
         out = model(ann).images[0]
         # With MOEfication

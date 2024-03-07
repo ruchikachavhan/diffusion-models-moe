@@ -2,19 +2,24 @@ import torch
 import numpy as np
 from diffusers.models.activations import GEGLU
 from neuron_receivers.base_receiver import BaseNeuronReceiver
+from collections import Counter
 
-class FrequencyMeasure(BaseNeuronReceiver):
+
+class GetExperts(BaseNeuronReceiver):
     def __init__(self, seed, T, n_layers, experts_per_layer, layer_names):
-        super(FrequencyMeasure, self).__init__(seed)
+        super(GetExperts, self).__init__(seed)
         self.label_counter = {}
+        self.score_tracker = {}
         self.T = T
         self.n_layers = n_layers
         self.experts_per_layer = experts_per_layer
         self.layer_names = layer_names
         for t in range(T):
             self.label_counter[t] = {}
+            self.score_tracker[t] = {}
             for i in range(n_layers):
-                self.label_counter[t][i] = np.zeros(experts_per_layer[layer_names[i]])
+                self.label_counter[t][i] = []
+                self.score_tracker[t][i] = []
         
         # initialise timestep and layer id
         self.timestep = 0
@@ -35,8 +40,10 @@ class FrequencyMeasure(BaseNeuronReceiver):
     def reset(self):
         for t in range(self.T):
             self.label_counter[t] = {}
+            self.score_tracker[t] = {}
             for i in range(self.n_layers):
-                self.label_counter[t][i] = np.zeros(self.experts_per_layer[self.layer_names[i]])
+                self.label_counter[t][i] = []
+                self.score_tracker[t][i] = []
         self.reset_time_layer()
 
     def hook_fn(self, module, input, output):
@@ -51,10 +58,26 @@ class FrequencyMeasure(BaseNeuronReceiver):
             gate_gelu = gate_gelu.view(-1, hidden_size)
             score = torch.matmul(gate_gelu, module.patterns.transpose(0, 1))
             labels = torch.topk(score, k=k, dim=-1)[1].view(bsz, seq_len, k)
-            labels_flatten = labels[0, :, :].detach().cpu().numpy()
-            # update counter for which expert was selected for this layer, update by 1/sequence_length
-            for i in range(labels_flatten.shape[0]):
-                self.label_counter[self.timestep][self.layer][labels_flatten[i, :]] += (1.0 / seq_len)
+
+            # get tokens that belong to bounding boxes
+            if module.bounding_box is not None:
+                score_within_bb = score.view(bsz, seq_len, -1)[:, module.bounding_box, :]
+                score_within_bb = score_within_bb.view(-1, score_within_bb.shape[-1])
+            else:
+                score_within_bb = score.view(-1, score.shape[-1]).clone()
+
+            topk_scores = torch.max(score_within_bb, dim=0)[0]
+            self.score_tracker[self.timestep][self.layer] = topk_scores.detach().cpu()
+            max_activated_expert = torch.max(score_within_bb, dim=1)[1]
+            # count the frequency of selecting each expert
+            freq = Counter(max_activated_expert.detach().cpu().numpy())
+            # sort the keys according to values
+            freq = dict(sorted(freq.items(), key=lambda item: item[1], reverse=True))
+            # select top 50% most frequently selected experts
+            max_activated_expert = list(freq.keys())[:int(len(freq) * 0.5)]
+            self.label_counter[self.timestep][self.layer] = max_activated_expert
+
+
             # select neurons based on the expert labels
             cur_mask = torch.nn.functional.embedding(labels, module.patterns).sum(-2)
             gate[cur_mask == False] = 0
@@ -62,3 +85,5 @@ class FrequencyMeasure(BaseNeuronReceiver):
         self.update_time_layer()
         hidden_states = hidden_states * gate
         return hidden_states
+    
+    

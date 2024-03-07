@@ -2,18 +2,21 @@ sparsity_checks:
   name: SparsityChecks
   calculate_fid_original: false
   change_activation: true
+moefication: null
+modularity: null
 dataset:
   path: '../COCO-vqa'
 inference:
   batch_size: 1
   num_images: 10000
+seed: 1
 res_path: 'results/stable-diffusion'
 model_id: 'runwayml/stable-diffusion-v1-5'
 n_layers: 16
 fine_tuned_unet: '../diffusers/examples/text_to_image/relufied-stable-diffusion-v1-5/checkpoint-14000/'
-gpu: 3
+gpu: 4
 timesteps: 51
-dbg: false
+dbg: true
   
 
   

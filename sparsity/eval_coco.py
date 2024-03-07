@@ -48,8 +48,8 @@ def evaluate_sd_model(model, imgs, anns, args, transform):
             break
         # genearate image from prompt
         # fix seed to get the same output
-        torch.manual_seed(0)
-        np.random.seed(0)
+        torch.manual_seed(args.seed)
+        np.random.seed(args.seed)
         generated_image = model(prompt=text).images[0]
         original_image = transform(Image.open(img).convert('RGB'))
         generated_image = transform(generated_image.convert('RGB'))
