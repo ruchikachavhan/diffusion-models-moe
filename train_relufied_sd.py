@@ -52,8 +52,9 @@ from diffusers.utils.import_utils import is_xformers_available
 from diffusers.utils.torch_utils import is_compiled_module
 from diffusers.models.activations import GEGLU
 
-# For MIMIC Dataset
-from get_dataset_mimic_cxr import MimicCXRDataset
+# Added by Raman
+from get_dataset_mimic_cxr import MimicCXRDataset # For MIMIC Dataset
+from adapters import *
 
 if is_wandb_available():
     import wandb
@@ -511,6 +512,14 @@ def parse_args():
         ),
     )
 
+    ### Added by Raman
+    parser.add_argument(
+        "--ft_method",
+        type=str,
+        default='full',
+        help="Fine-tuning method to be used",
+    )
+
     args = parser.parse_args()
     env_local_rank = int(os.environ.get("LOCAL_RANK", -1))
     if env_local_rank != -1 and env_local_rank != args.local_rank:
@@ -665,10 +674,17 @@ def main():
         args.pretrained_model_name_or_path, subfolder="unet", revision=args.non_ema_revision
     )
 
+    # Get the U-Net according to the fine-tuning strategy
+    unet = get_adapted_unet(unet, args.ft_method, args)
+
     # Freeze vae and text_encoder and set unet to trainable
     vae.requires_grad_(False)
     text_encoder.requires_grad_(False)
+
     unet.train()
+
+    # You can check the number of tunable parameters for each fine-tuning method as a safe-guard
+    tunable_params = check_tunable_params(unet, False) # set 'True' for verbose
 
     # Create EMA for the unet.
     if args.use_ema:
