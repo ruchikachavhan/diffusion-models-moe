@@ -4,6 +4,7 @@ results_seed_2/*
 results_seed_3/*
 results_seed_4/*
 results_seed_5/*
+results_all_seeds/*
 *.png
 __pycache__/
 *.jpg
