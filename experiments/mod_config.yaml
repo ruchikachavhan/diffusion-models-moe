@@ -7,7 +7,7 @@ modularity:
   adjective: 'white'
   margin: 0.05
   condition:
-    name: 'moefy_compare'
+    name: 'greater'
     skill_ratio: 0.5
   bounding_box: false
 dataset:
@@ -15,12 +15,12 @@ dataset:
 inference:
   batch_size: 1
   num_images: 10000
-res_path: 'results/stable-diffusion'
+res_path: 'results_all_seeds/stable-diffusion'
 model_id: 'runwayml/stable-diffusion-v1-5'
 n_layers: 16
 fine_tuned_unet: '../diffusers/examples/text_to_image/relufied-stable-diffusion-v1-5/checkpoint-14000/'
-gpu: 2
-seed: 1
+gpu: 1
+seed: 4
 timesteps: 51
 dbg: false
   

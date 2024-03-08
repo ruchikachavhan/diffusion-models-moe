@@ -40,7 +40,12 @@ class NeuronPredictivityBB(BaseNeuronReceiver):
         # For every latent vector, we choose only the activations that are within the bounding box
         if module.bounding_box is not None:
             gate_within_bb = gate[:, module.bounding_box, :]
-        max_act = torch.max(gate_within_bb.view(-1, gate.shape[-1]), dim=0)[0]
+        
+        # Sometimes the bounding box is too small and the gate is empty
+        try:
+            max_act = torch.max(gate_within_bb.view(-1, gate.shape[-1]), dim=0)[0]
+        except:
+            max_act = torch.max(gate.view(-1, gate.shape[-1]), dim=0)[0]
 
         self.predictivity.update(max_act.detach().cpu().numpy(), self.timestep, self.layer)
         self.update_time_layer()

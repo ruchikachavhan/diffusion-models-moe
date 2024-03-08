@@ -61,8 +61,11 @@ class GetExperts(BaseNeuronReceiver):
 
             # get tokens that belong to bounding boxes
             if module.bounding_box is not None:
-                score_within_bb = score.view(bsz, seq_len, -1)[:, module.bounding_box, :]
-                score_within_bb = score_within_bb.view(-1, score_within_bb.shape[-1])
+                try:
+                    score_within_bb = score.view(bsz, seq_len, -1)[:, module.bounding_box, :]
+                    score_within_bb = score_within_bb.view(-1, score_within_bb.shape[-1])
+                except:
+                    score_within_bb = score.view(-1, score.shape[-1]).clone()
             else:
                 score_within_bb = score.view(-1, score.shape[-1]).clone()
 

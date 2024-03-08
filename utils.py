@@ -47,7 +47,9 @@ def make_dirs(args):
 
         if not os.path.exists(args.modularity['skill_expert_path']):
             os.makedirs(args.modularity['skill_expert_path'])
+        if not os.path.exists(args.modularity['remove_expert_path']):
             os.makedirs(args.modularity['remove_expert_path'])
+        if not os.path.exists(args.modularity['remove_expert_path_val']):
             os.makedirs(args.modularity['remove_expert_path_val'])
         
         if not os.path.exists(args.modularity['img_save_path']):
@@ -127,6 +129,8 @@ class Config:
             ratio = self.modularity['condition']['skill_ratio']
             condition = self.modularity['condition']['name'] 
             self.modularity['skill_expert_path'] = os.path.join(self.res_path, self.model_id, exp_name, self.modularity['adjective'], f'skilled_neuron_{condition}_{ratio}')
+            if self.modularity['bounding_box']:
+                self.modularity['skill_expert_path'] = os.path.join(self.modularity['skill_expert_path'], 'with_bounding_boxes')
             self.modularity['remove_expert_path'] = os.path.join(self.modularity['skill_expert_path'], 'remove_experts')
             self.modularity['remove_expert_path_val'] = os.path.join(self.modularity['skill_expert_path'], 'remove_experts_val')
             self.modularity['plots'] = os.path.join(self.modularity['skill_expert_path'], 'plots')

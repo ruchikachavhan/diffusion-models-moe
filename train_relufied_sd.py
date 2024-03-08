@@ -814,7 +814,7 @@ def main():
     # We need to tokenize inputs and targets.
 
     # Note: We do not need to run this for MIMIC dataset
-    if(args.dataset != 'mimic'):
+    if(args.dataset_name != 'mimic'):
         column_names = dataset["train"].column_names
 
         # 6. Get the column names for input/target.
@@ -837,7 +837,7 @@ def main():
                 )   
 
     # Note: We do not need to run this for MIMIC dataset
-    if(args.dataset != 'mimic'):
+    if(args.dataset_name != 'mimic'):
         # Preprocessing the datasets.
         # We need to tokenize input captions and transform the images.
         def tokenize_captions(examples, is_train=True):

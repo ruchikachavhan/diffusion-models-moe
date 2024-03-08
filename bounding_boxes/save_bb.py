@@ -30,15 +30,15 @@ def get_bounding_box(img, bb_model, tokenizer, prompt, question=f"Frame the loca
     # Get bounding box coordinates
     response, history = bb_model.chat(tokenizer, query, history=None)
 
-    print("Response:", response)
-
     image = tokenizer.draw_bbox_on_latest_picture(response, history)
     if image:
         image.save('test_images/bbox.png')
     else:
         print("no box")
 
+
     top_left, bottom_right = get_bounding_box_from_response(response)
+    print("Bounding box coordinates: ", top_left, bottom_right)
     return top_left, bottom_right
     
 def get_bounding_box_latent(layer_names, top_left_coord, bottom_right_coord, latent_space_seq_length, default_img_size=512):
