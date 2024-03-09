@@ -132,12 +132,30 @@ def main():
             print(f'timestep: {t}, layer: {l}, skilled experts: {skilled_experts}')
             with open(os.path.join(args.modularity['skill_expert_path'], f'timestep_{t}_layer_{l}.json'), 'w') as f:
                 json.dump(skilled_experts, f)
-
-
-        
-
         iter += 1
 
 
 if __name__ == "__main__":
     main()
+
+# dog
+# mouse
+# bear
+# car
+# chair
+# bag
+# door
+# rabbit
+# ball
+# bat
+# horse
+# bird
+# flower
+# bowl
+# paper
+# wall
+# building
+# chicken
+# desk
+# duck
+# couch

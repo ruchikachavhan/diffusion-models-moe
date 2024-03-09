@@ -9,8 +9,8 @@ import eval_coco as ec
 from neuron_receivers import NeuronSpecialisation
 sys.path.append('moefication')
 from helper import modify_ffn_to_experts
-
-def remove_experts(adj_prompts, model, neuron_receiver, args, val=False):
+ 
+def remove_experts(adj_prompts, model, neuron_receiver, args, bounding_box, val=False):
     iter = 0
     for ann_adj in adj_prompts:
         if iter >= 2 and args.dbg:
@@ -23,7 +23,7 @@ def remove_experts(adj_prompts, model, neuron_receiver, args, val=False):
         out = model(ann_adj).images[0]
 
         neuron_receiver.reset_time_layer()
-        out_adj, pred_adj = neuron_receiver.observe_activation(model, ann_adj)
+        out_adj, pred_adj = neuron_receiver.observe_activation(model, ann_adj, bounding_box[ann_adj+'\n'] if args.modularity['bounding_box'] else None)
         # save images
         prefix = args.modularity['remove_expert_path'] if not val else args.modularity['remove_expert_path_val']
         out.save(os.path.join(prefix, f'img_{iter}.jpg'))
@@ -48,15 +48,22 @@ def main():
     adjectives = args.modularity['adjective']
     adj_prompts = [f'a {adjectives} {thing}' for thing in objects]
 
+    if args.modularity['bounding_box']:
+        # read bounding box coordinates
+        with open(os.path.join(args.save_path, 'bb_coordinates_layer_adj.json')) as f:
+            bb_coordinates_layer_adj = json.load(f)
+            print(bb_coordinates_layer_adj.keys())
+        with open(os.path.join(args.save_path, 'bb_coordinates_layer_base.json')) as f:
+            bb_coordinates_layer_base = json.load(f)
     # COnvert FFns into moe
     model, _, _ = modify_ffn_to_experts(model, args)
 
-    if args.fine_tuned_unet is not None:
-        neuron_receiver.test(model, relu_condition=args.fine_tuned_unet is not None)
-        print("Neuron receiver test passed")
+    # if args.fine_tuned_unet is not None:
+    #     neuron_receiver.test(model, relu_condition=args.fine_tuned_unet is not None)
+    #     print("Neuron receiver test passed")
     
     # remove experts
-    remove_experts(adj_prompts, model, neuron_receiver, args)
+    remove_experts(adj_prompts, model, neuron_receiver, args, bounding_box=bb_coordinates_layer_adj if args.modularity['bounding_box'] else None)
 
     # read val_dataset
     with open(f'modularity/val_things_{adjectives}.txt') as f:
@@ -65,7 +72,7 @@ def main():
     val_base_prompts = [f'a {thing.strip()}' for thing in val_objects]
     
     # remove experts from val_dataset
-    remove_experts(val_base_prompts, model, neuron_receiver, args, val=True)
+    # remove_experts(val_base_prompts, model, neuron_receiver, args, bounding_box=args.modularity['bounding_box'] if args.modularity['bounding_box'] else None, val=True)
     
 
 if __name__ == "__main__":

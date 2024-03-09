@@ -9,12 +9,16 @@ modularity:
   condition:
     name: 't_test'
     skill_ratio: 0.5
+    base_prompts: 'predictivity_base.json'
+    concept_prompts: 'predictivity_adj.json'
+    diff_std: 'diff_std.json'
+  bounding_box: true
 dataset:
   path: '../COCO-vqa'
 inference:
   batch_size: 1
   num_images: 10000
-seed: 1
+seed: 0
 res_path: 'results/stable-diffusion'
 model_id: 'runwayml/stable-diffusion-v1-5'
 n_layers: 16

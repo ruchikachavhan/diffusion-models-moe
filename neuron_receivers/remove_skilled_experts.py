@@ -44,13 +44,19 @@ class NeuronSpecialisation(NeuronPredictivity):
             labels = labels[mask == 1]
             labels = labels.view(bsz, seq_len, -1)
             cur_mask = torch.nn.functional.embedding(labels, module.patterns).sum(-2)
-            gate[cur_mask == False] = 0
+            # if module.bounding_box is not None:
+            # #     # set gate values and cur_mask values to 0 where cur_mask is False
+            #     curr_mask_within_bb  = torch.nn.functional.embedding(labels[:, module.bounding_box, :], module.patterns).sum(-2)
+            #     gate[:, module.bounding_box, :][curr_mask_within_bb == 0] = 0
+            # else:
+            gate[cur_mask == 0] = 0
         
         self.update_time_layer()
                 
         hidden_states = hidden_states * gate
         self.gates.append(gate.detach().cpu())
         return hidden_states
+    
     
     def test(self, model, ann = 'an white cat', relu_condition = False):
         # hook the model

@@ -106,8 +106,11 @@ class Config:
         for key, value in config.items():
             setattr(self, key, value)
         
-        if self.seed!=0:
+        if self.seed!=0 and self.seed!='all':
             self.res_path = f'results_seed_{self.seed}' + '/' + self.res_path.split('/')[1]
+        elif self.seed == 'all':
+            self.res_path = 'results_all_seeds' + '/' + self.res_path.split('/')[1]
+            self.seed = self.default_eval_seed
     
         # change result directory
         if self.fine_tuned_unet is not None:

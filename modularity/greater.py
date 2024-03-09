@@ -51,7 +51,8 @@ def main():
             base_std = np.array(base_prompt_pred[str(i)]['std'])
             adj_avg = np.array(adj_prompt_pred[str(i)]['avg'])
             adj_std = np.array(adj_prompt_pred[str(i)]['std'])
-            is_greater = adj_avg > base_avg + args.modularity['margin']
+            # max standard deviation of base and adj predictivity is the margin
+            is_greater = adj_avg > base_avg + base_std
             
             avg_exp_pred = [] # list will store expert specialisation score for a layer
             # cluster neurons into experts
@@ -62,14 +63,16 @@ def main():
                 avg_pred_expert = base_avg[neurons].mean()
                 avg_pred_expert_adj = adj_avg[neurons].mean()
                 # calculate the average predictivity for this expert
-                is_expert_skilled = is_greater[neurons]                 
-                avg_exp_pred.append(np.mean(is_expert_skilled) * 100.0)
+                is_expert_skilled = is_greater[neurons]      
+                avg_exp_pred.append(np.mean(is_expert_skilled))
             
+        
             # save expert indices that are skilled
-            skilled_experts = np.where(np.array(avg_exp_pred) > args.modularity['condition']['skill_ratio'] * 100.0)[0].tolist()
-            # save as json file
+            skilled_experts = np.where(np.array(avg_exp_pred) > args.modularity['condition']['skill_ratio'])[0].tolist()
+            # # save as json file
             with open(os.path.join(args.modularity['skill_expert_path'], f'timestep_{t_step}_layer_{i}.json'), 'w') as f:
                 json.dump(skilled_experts, f)
+            print(f'Layer {i} timestep {t_step} skilled experts: {skilled_experts}')
 
             ax[i//4, i%4].plot(avg_exp_pred, marker='o')
             ax[i//4, i%4].set_title(f'Layer {i}', fontsize=20)

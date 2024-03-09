@@ -83,7 +83,7 @@ def main():
     #         # sort the counter keys according to values
     #         sorted_experts = sorted(intersection_dict[t][l], key=intersection_dict[t][l].get, reverse=True)
     #         # select the top 40% experts
-    #         topk_experts = sorted_experts[:int(len(sorted_experts)* 0.4)]
+    #         topk_experts = sorted_experts[:int(len(sorted_experts)* 0.8)]
     #         intersection_dict[t][l] = topk_experts
     #         print(f"timestep {t}, layer {l}: {intersection_dict[t][l]}")
     

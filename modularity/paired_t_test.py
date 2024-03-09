@@ -29,43 +29,49 @@ def main():
     adjectives = args.modularity['adjective']
     adj_prompts = [f'a {adjectives} {thing}' for thing in objects]
 
+    # read predicitivity files 
+    predictivity_data = {}
+    predictivity_data['base'] = json.load(open(os.path.join(args.save_path, args.modularity['condition']['base_prompts'])))
+    predictivity_data['adj'] = json.load(open(os.path.join(args.save_path, args.modularity['condition']['concept_prompts'])))
+    # read standard dev path
+    diff_std = json.load(open(os.path.join(args.save_path, args.modularity['condition']['diff_std'])))
     # Initialise average and standard deviation for base and adj prompts
-    base_avg, adj_avg, diff_std = {}, {}, {}
-    for t in range(0, args.timesteps):
-        base_avg[t], adj_avg[t], diff_std[t] = {}, {}, {}
-        for l in range(0, args.n_layers):
-            base_avg[(t, l)] = utils.Average()
-            adj_avg[(t, l)] = utils.Average()
-            diff_std[(t, l)] = utils.StandardDev()
+    # base_avg, adj_avg, diff_std = {}, {}, {}
+    # for t in range(0, args.timesteps):
+    #     base_avg[t], adj_avg[t], diff_std[t] = {}, {}, {}
+    #     for l in range(0, args.n_layers):
+    #         base_avg[(t, l)] = utils.Average()
+    #         adj_avg[(t, l)] = utils.Average()
+    #         diff_std[(t, l)] = utils.StandardDev()
 
     # For each time step and layer, calculate the average neuron activation of the base and adj prompts
     # Also calculate standard deviation of the difference between base and adj prompts over all prompts
-    for i in range(1, len(base_prompts)+1):
-        print(f"Processing prompt {i}")
-        base_states = torch.load(os.path.join(args.modularity['hidden_states_path'], f'hidden_states_base_{i}.pth'))
-        adj_states = torch.load(os.path.join(args.modularity['hidden_states_path'], f'hidden_states_adj_{i}.pth'))
-        for t in range(args.timesteps):
-            for l in range(args.n_layers):
-                feat_dim = base_states[t][l].shape[-1]
-                base_states_ = base_states[t][l].reshape(-1, feat_dim).max(0)[0]
-                adj_states_ = adj_states[t][l].reshape(-1, feat_dim).max(0)[0]
-                base_avg[(t, l)].update(base_states_)
-                adj_avg[(t, l)].update(adj_states_)
+    # for i in range(1, len(base_prompts)+1):
+    #     print(f"Processing prompt {i}")
+        # base_states = torch.load(os.path.join(args.modularity['hidden_states_path'], f'hidden_states_base_{i}.pth'))
+        # adj_states = torch.load(os.path.join(args.modularity['hidden_states_path'], f'hidden_states_adj_{i}.pth'))
+        # for t in range(args.timesteps):
+        #     for l in range(args.n_layers):
+        #         feat_dim = base_states[t][l].shape[-1]
+        #         base_states_ = base_states[t][l].reshape(-1, feat_dim).max(0)[0]
+        #         adj_states_ = adj_states[t][l].reshape(-1, feat_dim).max(0)[0]
+        #         base_avg[(t, l)].update(base_states_)
+        #         adj_avg[(t, l)].update(adj_states_)
 
-                diff = base_states_ - adj_states_
-                diff_std[(t, l)].update(diff)
+        #         diff = base_states_ - adj_states_
+        #         diff_std[(t, l)].update(diff)
 
     # Perform the t test 
     skilled_neurons = {}
     for t in range(args.timesteps):
         skilled_neurons[t] = {}
         for l in range(args.n_layers):
-            base = base_avg[(t, l)].avg
-            adj = adj_avg[(t, l)].avg
-            diff = diff_std[(t, l)].stddev() + 1e-6
+            print(f"Processing time step {t} and layer {l}")
+            base = np.array(predictivity_data['base']['time_steps'][str(t)][str(l)]['avg'])
+            adj = np.array(predictivity_data['adj']['time_steps'][str(t)][str(l)]['avg'])
+            diff = np.array(diff_std[str(t)][str(l)])
             # t value
             t_value = (base - adj) / (diff /  len(base_prompts) ** 0.5)
-            t_value = t_value.cpu().numpy()
             # one sided upper tail t-test with alpha = 0.05
             # If neuron passes the t-test, it is considered skilled
             skilled_neurons[t][l] = torch.tensor(t_value < -1.645)

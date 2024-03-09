@@ -48,6 +48,14 @@ def main():
             print(bb_coordinates_layer_base.keys())
 
     iter = 0
+
+    # initialise a standard deviation mesurement for difference in predictivities for concept and base prompt
+    diff_std = {}
+    for t in range(args.timesteps):
+        diff_std[t] = {}
+        for l in range(args.n_layers):
+            diff_std[t][l] = utils.StandardDev()
+
     for ann, ann_adj in tqdm.tqdm(zip(base_prompts, adj_prompts)):
         if iter >= 5 and args.dbg:
             break
@@ -59,6 +67,10 @@ def main():
         neuron_pred_adj.reset_time_layer()
         out_adj, _ = neuron_pred_adj.observe_activation(model, ann_adj, bboxes=bb_coordinates_layer_adj[ann_adj] if args.modularity['bounding_box'] else None)
 
+        for t in range(args.timesteps):
+            for l in range(args.n_layers):
+                diff = neuron_pred_base.max_gate[t][l] - neuron_pred_adj.max_gate[t][l]
+                diff_std[t][l].update(diff)
         # save images
         out.save(os.path.join(args.modularity['img_save_path'], f'base_{iter}.jpg'))
         out_adj.save(os.path.join(args.modularity['img_save_path'], f'adj_{iter}.jpg'))
@@ -72,6 +84,15 @@ def main():
     else:
         neuron_pred_adj.predictivity.save(os.path.join(args.save_path, 'predictivity_adj.json'))
         neuron_pred_base.predictivity.save(os.path.join(args.save_path, 'predictivity_base.json'))
+        # save diff_std
+        for t in range(args.timesteps):
+            for l in range(args.n_layers):
+                diff_std[t][l] = diff_std[t][l].stddev().tolist()
+        
+        # save diff_std
+        with open(os.path.join(args.save_path, 'diff_std.json'), 'w') as f:
+            json.dump(diff_std, f)
+
 
 
 

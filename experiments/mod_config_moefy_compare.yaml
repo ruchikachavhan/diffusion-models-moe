@@ -4,7 +4,7 @@ moefication:
   templates: '%s.%s.attentions.%s.transformer_blocks.0.ff.net.0.proj.weight'
   topk_experts: 1.0
 modularity:
-  adjective: 'white'
+  adjective: 'black'
   margin: 0.05
   condition:
     name: 'moefy_compare'
@@ -15,7 +15,7 @@ dataset:
 inference:
   batch_size: 1
   num_images: 10000
-seed: 4
+seed: 0
 res_path: 'results/stable-diffusion'
 model_id: 'runwayml/stable-diffusion-v1-5'
 n_layers: 16

@@ -62,24 +62,19 @@ class GetExperts(BaseNeuronReceiver):
             # get tokens that belong to bounding boxes
             if module.bounding_box is not None:
                 try:
-                    score_within_bb = score.view(bsz, seq_len, -1)[:, module.bounding_box, :]
-                    score_within_bb = score_within_bb.view(-1, score_within_bb.shape[-1])
+                    gate_within_bb = gate[:, module.bounding_box, :]
+                    score_within_bb = torch.matmul(gate_within_bb.view(-1, hidden_size), module.patterns.transpose(0, 1))
                 except:
-                    score_within_bb = score.view(-1, score.shape[-1]).clone()
-            else:
-                score_within_bb = score.view(-1, score.shape[-1]).clone()
+                    gate_within_bb = gate
+                    score_within_bb = score           
 
-            topk_scores = torch.max(score_within_bb, dim=0)[0]
-            self.score_tracker[self.timestep][self.layer] = topk_scores.detach().cpu()
-            max_activated_expert = torch.max(score_within_bb, dim=1)[1]
-            # count the frequency of selecting each expert
-            freq = Counter(max_activated_expert.detach().cpu().numpy())
-            # sort the keys according to values
-            freq = dict(sorted(freq.items(), key=lambda item: item[1], reverse=True))
-            # select top 50% most frequently selected experts
-            max_activated_expert = list(freq.keys())[:int(len(freq) * 0.5)]
-            self.label_counter[self.timestep][self.layer] = max_activated_expert
-
+            labels_within_bb = torch.topk(score_within_bb, k=k, dim=-1)[1].view(bsz, len(module.bounding_box), k)
+            labels_within_bb = labels_within_bb.view(-1)
+            counter = Counter(labels_within_bb.cpu().numpy())
+            counter = dict(sorted(counter.items(), key=lambda item: item[1], reverse=True))
+            max_activated_experts = list(counter.keys())[:int(0.5*len(counter))]
+            self.score_tracker[self.timestep][self.layer] = score_within_bb.detach().cpu().numpy()
+            self.label_counter[self.timestep][self.layer] = max_activated_experts
 
             # select neurons based on the expert labels
             cur_mask = torch.nn.functional.embedding(labels, module.patterns).sum(-2)
