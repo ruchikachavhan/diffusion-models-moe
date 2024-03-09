@@ -1,0 +1,23 @@
+dataset:
+  path: '../COCO-vqa'
+inference:
+  batch_size: 1
+  num_images: 1000
+moefication: 
+  name: Moefication
+  expert_size: 20
+  templates: '%s.%s.attentions.%s.transformer_blocks.0.ff.net.0.proj.weight'
+  topk_experts: 0.4
+modularity: null
+seed: 0
+save_path: 'results/stable-diffusion'
+model_id: 'runwayml/stable-diffusion-v1-5'
+model_name: null
+n_layers: 16
+fine_tuned_unet: '../diffusers/examples/text_to_image/relufied-stable-diffusion-v1-5/checkpoint-14000/,../diffusers/examples/text_to_image/relufied-sd-laion-bias/checkpoint-15000/'
+model_names: 'relufied-stable-diffusion-v1-5,relufied-sd-laion-bias'
+gpu: 4
+timesteps: 51
+dbg: false
+
+  

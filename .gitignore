@@ -5,6 +5,7 @@ results_seed_3/*
 results_seed_4/*
 results_seed_5/*
 results_all_seeds/*
+compare_models_results/*
 *.png
 __pycache__/
 *.jpg
