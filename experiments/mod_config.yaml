@@ -9,7 +9,7 @@ modularity:
   condition:
     name: 't_test'
     skill_ratio: 0.5
-  bounding_box: false
+  bounding_box: true
 dataset:
   path: '../COCO-vqa'
 inference:

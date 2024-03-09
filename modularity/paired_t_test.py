@@ -25,9 +25,7 @@ def main():
     with open('modularity/things.txt', 'r') as f:
         objects = f.readlines()
     base_prompts = [f'a {thing.strip()}' for thing in objects]
-    # add an adjective of choice to every element in things list
-    adjectives = args.modularity['adjective']
-    adj_prompts = [f'a {adjectives} {thing}' for thing in objects]
+
 
     # read predicitivity files 
     predictivity_data = {}
@@ -35,31 +33,6 @@ def main():
     predictivity_data['adj'] = json.load(open(os.path.join(args.save_path, args.modularity['condition']['concept_prompts'])))
     # read standard dev path
     diff_std = json.load(open(os.path.join(args.save_path, args.modularity['condition']['diff_std'])))
-    # Initialise average and standard deviation for base and adj prompts
-    # base_avg, adj_avg, diff_std = {}, {}, {}
-    # for t in range(0, args.timesteps):
-    #     base_avg[t], adj_avg[t], diff_std[t] = {}, {}, {}
-    #     for l in range(0, args.n_layers):
-    #         base_avg[(t, l)] = utils.Average()
-    #         adj_avg[(t, l)] = utils.Average()
-    #         diff_std[(t, l)] = utils.StandardDev()
-
-    # For each time step and layer, calculate the average neuron activation of the base and adj prompts
-    # Also calculate standard deviation of the difference between base and adj prompts over all prompts
-    # for i in range(1, len(base_prompts)+1):
-    #     print(f"Processing prompt {i}")
-        # base_states = torch.load(os.path.join(args.modularity['hidden_states_path'], f'hidden_states_base_{i}.pth'))
-        # adj_states = torch.load(os.path.join(args.modularity['hidden_states_path'], f'hidden_states_adj_{i}.pth'))
-        # for t in range(args.timesteps):
-        #     for l in range(args.n_layers):
-        #         feat_dim = base_states[t][l].shape[-1]
-        #         base_states_ = base_states[t][l].reshape(-1, feat_dim).max(0)[0]
-        #         adj_states_ = adj_states[t][l].reshape(-1, feat_dim).max(0)[0]
-        #         base_avg[(t, l)].update(base_states_)
-        #         adj_avg[(t, l)].update(adj_states_)
-
-        #         diff = base_states_ - adj_states_
-        #         diff_std[(t, l)].update(diff)
 
     # Perform the t test 
     skilled_neurons = {}

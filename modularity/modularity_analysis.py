@@ -65,6 +65,7 @@ def main():
         out, _ = neuron_pred_base.observe_activation(model, ann, bboxes=bb_coordinates_layer_base[ann] if args.modularity['bounding_box'] else None)
 
         neuron_pred_adj.reset_time_layer()
+        ann_adj = ann_adj.split('\n')[0]
         out_adj, _ = neuron_pred_adj.observe_activation(model, ann_adj, bboxes=bb_coordinates_layer_adj[ann_adj] if args.modularity['bounding_box'] else None)
 
         for t in range(args.timesteps):
@@ -76,19 +77,24 @@ def main():
         out_adj.save(os.path.join(args.modularity['img_save_path'], f'adj_{iter}.jpg'))
         iter += 1
 
+    for t in range(args.timesteps):
+        for l in range(args.n_layers):
+            diff_std[t][l] = diff_std[t][l].stddev().tolist()
+    
+
     # save results
     print("Saving results")
     if args.modularity['bounding_box']:
         neuron_pred_adj.predictivity.save(os.path.join(args.save_path, 'predictivity_adj_bb.json'))
         neuron_pred_base.predictivity.save(os.path.join(args.save_path, 'predictivity_base_bb.json'))
+        # save diff_std
+        with open(os.path.join(args.save_path, 'diff_std_bb.json'), 'w') as f:
+            json.dump(diff_std, f)
     else:
         neuron_pred_adj.predictivity.save(os.path.join(args.save_path, 'predictivity_adj.json'))
         neuron_pred_base.predictivity.save(os.path.join(args.save_path, 'predictivity_base.json'))
         # save diff_std
-        for t in range(args.timesteps):
-            for l in range(args.n_layers):
-                diff_std[t][l] = diff_std[t][l].stddev().tolist()
-        
+    
         # save diff_std
         with open(os.path.join(args.save_path, 'diff_std.json'), 'w') as f:
             json.dump(diff_std, f)

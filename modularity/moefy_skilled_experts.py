@@ -96,14 +96,12 @@ def main():
         # save image
         out.save(f'test_images/test_image_base.png')
         label_counter = freq_counter.label_counter.copy()
-        expert_score = freq_counter.score_tracker.copy()
             
         freq_counter.reset()
         out_adj, _ = freq_counter.observe_activation(model, ann_adj, bboxes=bb_coordinates_layer_adj[ann_adj+'\n'] if args.modularity['bounding_box'] else None)
         # save image
         out_adj.save(f'test_images/test_image_adj.png')
         label_counter_adj = freq_counter.label_counter.copy()
-        expert_score_adj = freq_counter.score_tracker.copy()
 
         iter += 1
 
@@ -138,24 +136,3 @@ def main():
 if __name__ == "__main__":
     main()
 
-# dog
-# mouse
-# bear
-# car
-# chair
-# bag
-# door
-# rabbit
-# ball
-# bat
-# horse
-# bird
-# flower
-# bowl
-# paper
-# wall
-# building
-# chicken
-# desk
-# duck
-# couch

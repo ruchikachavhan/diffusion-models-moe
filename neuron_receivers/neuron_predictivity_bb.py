@@ -12,6 +12,11 @@ class NeuronPredictivityBB(BaseNeuronReceiver):
         self.T = T
         self.n_layers = n_layers
         self.predictivity = utils.StatMeter(T, n_layers)
+        self.max_gate = {}
+        for t in range(T):
+            self.max_gate[t] = {}
+            for l in range(n_layers):
+                self.max_gate[t][l] = []
         
         self.timestep = 0
         self.layer = 0
@@ -29,6 +34,11 @@ class NeuronPredictivityBB(BaseNeuronReceiver):
     def reset_time_layer(self):
         self.timestep = 0
         self.layer = 0
+        # reset the gate
+        for t in range(self.T):
+            self.max_gate[t] = {}
+            for l in range(self.n_layers):
+                self.max_gate[t][l] = []
     
     def hook_fn(self, module, input, output):
         # save the out
@@ -46,6 +56,7 @@ class NeuronPredictivityBB(BaseNeuronReceiver):
             max_act = torch.max(gate_within_bb.view(-1, gate.shape[-1]), dim=0)[0]
         except:
             max_act = torch.max(gate.view(-1, gate.shape[-1]), dim=0)[0]
+        self.max_gate[self.timestep][self.layer] = max_act.detach().cpu().numpy()
 
         self.predictivity.update(max_act.detach().cpu().numpy(), self.timestep, self.layer)
         self.update_time_layer()

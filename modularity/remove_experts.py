@@ -23,7 +23,8 @@ def remove_experts(adj_prompts, model, neuron_receiver, args, bounding_box, val=
         out = model(ann_adj).images[0]
 
         neuron_receiver.reset_time_layer()
-        out_adj, pred_adj = neuron_receiver.observe_activation(model, ann_adj, bounding_box[ann_adj+'\n'] if args.modularity['bounding_box'] else None)
+        ann_adj = ann_adj.split('\n')[0]
+        out_adj, pred_adj = neuron_receiver.observe_activation(model, ann_adj, bounding_box[ann_adj] if args.modularity['bounding_box'] else None)
         # save images
         prefix = args.modularity['remove_expert_path'] if not val else args.modularity['remove_expert_path_val']
         out.save(os.path.join(prefix, f'img_{iter}.jpg'))
