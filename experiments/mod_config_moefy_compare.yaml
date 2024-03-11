@@ -4,7 +4,7 @@ moefication:
   templates: '%s.%s.attentions.%s.transformer_blocks.0.ff.net.0.proj.weight'
   topk_experts: 1.0
 modularity:
-  adjective: 'black'
+  adjective: 'white'
   margin: 0.05
   condition:
     name: 'moefy_compare'

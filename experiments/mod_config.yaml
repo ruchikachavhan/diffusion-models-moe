@@ -7,7 +7,7 @@ modularity:
   adjective: 'white'
   margin: 0.05
   condition:
-    name: 't_test'
+    name: 'moefy_compare'
     skill_ratio: 0.5
   bounding_box: true
 dataset:

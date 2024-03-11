@@ -19,18 +19,20 @@ import utils
 from scipy import stats
 from collections import Counter
 
-
-def update_table(table, freq_base, freq_adj):
-    # update the contingency table
-    # 0, 0 is the when freq base and freq adj is True
-    # 0, 1 is when freq base is False and freq adj is True
-    # 1, 0 is when freq base is Trye and freq adj is False
-    # 1, 1 is when freq base and freq adj is False
-    table[0, 0] += (freq_base & freq_adj).sum() 
-    table[0, 1] += (freq_base & ~freq_adj).sum()
-    table[1, 0] += (~freq_base & freq_adj).sum()
-    table[1, 1] += (~freq_base & ~freq_adj).sum()
-    return table
+def update_expert_counter(args, ffn_names_list, num_experts_per_ffn, init=False, label_counter=None, expert_counter=None, num_samples=None):
+    if init:
+        expert_counter = {}
+        for t in range(args.timesteps):
+            expert_counter[t] = {}
+            for ffn_name in ffn_names_list:
+                expert_counter[t][ffn_name] = [0] * num_experts_per_ffn[ffn_name]
+    else:
+        # add to expert counter
+        for t in range(args.timesteps):
+            for ffn_name in ffn_names_list:
+                for expert in range(num_experts_per_ffn[ffn_name]):
+                    expert_counter[t][ffn_name][expert] += label_counter[t][ffn_names_list.index(ffn_name)][expert] / num_samples
+    return expert_counter
 
 def check_condition(val, args):
     return val > args.modularity['condition']['skill_ratio']
@@ -78,13 +80,9 @@ def main():
     freq_counter = GetExperts(args.seed, args.timesteps, args.n_layers, num_experts_per_ffn, ffn_names_list)
     iter = 0
 
-    expert_diff, union_counter = {}, {}
-    for t in range(args.timesteps):
-        expert_diff[t] = {}
-        union_counter[t] = {}
-        for l in range(args.n_layers):
-            expert_diff[t][l] = []
-            union_counter[t][l] = []
+    # bad solution for averaging but had to do it
+    expert_counter = update_expert_counter(args, ffn_names_list, num_experts_per_ffn, init=True)
+    expert_counter_adj = update_expert_counter(args, ffn_names_list, num_experts_per_ffn, init=True)
 
     for ann, ann_adj in tqdm.tqdm(zip(base_prompts, adj_prompts)):
         if iter >= 5 and args.dbg:
@@ -98,39 +96,45 @@ def main():
         label_counter = freq_counter.label_counter.copy()
             
         freq_counter.reset()
-        out_adj, _ = freq_counter.observe_activation(model, ann_adj, bboxes=bb_coordinates_layer_adj[ann_adj+'\n'] if args.modularity['bounding_box'] else None)
+
+        out_adj, _ = freq_counter.observe_activation(model, ann_adj, bboxes=bb_coordinates_layer_adj[ann_adj] if args.modularity['bounding_box'] else None)
         # save image
         out_adj.save(f'test_images/test_image_adj.png')
         label_counter_adj = freq_counter.label_counter.copy()
 
+        # add to expert counter
+        expert_counter = update_expert_counter(args, ffn_names_list, num_experts_per_ffn, 
+                                               label_counter=label_counter, expert_counter=expert_counter, num_samples=len(base_prompts))
+        expert_counter_adj = update_expert_counter(args, ffn_names_list, num_experts_per_ffn, 
+                                                label_counter=label_counter_adj, expert_counter=expert_counter_adj, num_samples=len(adj_prompts))
+
         iter += 1
 
-        # for each timestep and layer, select top 70% most frequently selected experts
-        # this corresponds to selecting experts that have been chosen by more than 70% of the tokens
-        for t in range(args.timesteps):
-            for l in range(args.n_layers):
-                # select the top 70% most frequently selected experts
-                expert_base = label_counter[t][l]
-                expert_adj = label_counter_adj[t][l]
-                # symmetric set difference
-                diff = list(set(expert_adj) - set(expert_base))
-                expert_diff[t][l] += diff
-                # count how many times an expert occured in the union of the two sets
-                union_counter[t][l] = Counter(expert_diff[t][l])
-
-                  
-    # based on frequency of that expert in the union, select the expert
+    # Compare most commonly selected experts
+    set_diff = {}
     for t in range(args.timesteps):
-        for l in range(args.n_layers): 
-            # sort the counter keys based on values
-            union_counter[t][l] = dict(sorted(union_counter[t][l].items(), key=lambda item: item[1], reverse=True))
-            # save top 80% most frequently selected experts
-            skilled_experts = list(union_counter[t][l].keys())[:int(len(union_counter[t][l]) * 0.5)]
-            skilled_experts = [int(expert) for expert in skilled_experts]
-            print(f'timestep: {t}, layer: {l}, skilled experts: {skilled_experts}')
+        set_diff[t] = {}
+        for l, ffn_name in enumerate(ffn_names_list):
+            set_diff[t][l] = []
+
+    for t in range(args.timesteps):
+        for l, ffn_name in enumerate(ffn_names_list):
+            list_freq1 = expert_counter[t][ffn_name]
+            list_freq2 = expert_counter_adj[t][ffn_name]
+            # select top - 70% of the experts
+            topk = int(0.6 * len(list_freq1))
+            # do argmax in descending order for topk
+            # argsort in descending order 
+            list_freq1 = np.argsort(list_freq1)[::-1][:topk]
+            list_freq2 = np.argsort(list_freq2)[::-1][:topk]
+
+            # find the difference in the sets
+            set_diff[t][l] = set(list_freq2) - set(list_freq1)
+            set_diff[t][l] = list(int(i) for i in set_diff[t][ffn_name])
+            print(f"Set difference at time step {t} and layer {ffn_name}: {set_diff[t][l]}")
+            # save the difference
             with open(os.path.join(args.modularity['skill_expert_path'], f'timestep_{t}_layer_{l}.json'), 'w') as f:
-                json.dump(skilled_experts, f)
-        iter += 1
+                json.dump(set_diff[t][l], f)
 
 
 if __name__ == "__main__":
