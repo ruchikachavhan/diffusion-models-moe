@@ -16,6 +16,7 @@ import moe_utils
 from helper import modify_ffn_to_experts
 sys.path.append('comparing_two_models')
 from config_utils import Config
+import matplotlib.pyplot as plt
 
 def  make_expert_counter(timesteps, ffn_names_list, num_experts_per_ffn):
     # bad solution for averaging but had to do it
@@ -97,7 +98,13 @@ def main():
         for ffn_name in ffn_names_list:
             set_diff[t][ffn_name] = []
 
+    t_range = [0, 10, 20, 30, 40, 50]
+    fig, ax = plt.subplots(3, 2, figsize=(12, 12))
+    # put hspace between subplots
+    plt.subplots_adjust(hspace=0.5)
+    fig.suptitle('Set intersecton ratio in expert selection')
     for t in range(args[0].timesteps):
+        ratios = []
         for ffn_name in ffn_names_list:
             list_freq1 = expert_counter[0][str(t)][ffn_name]
             list_freq2 = expert_counter[1][str(t)][ffn_name]
@@ -112,6 +119,18 @@ def main():
             set_diff[t][ffn_name] = set(list_freq1).intersection(set(list_freq2))
             ratio_set_diff = len(set_diff[t][ffn_name]) / len(list_freq1)
             print(f"ratio of set difference - {ffn_name}: {ratio_set_diff}")
+            ratios.append(ratio_set_diff)
+            # plot the set difference for each timestep
+        if t in t_range:
+            axes = ax[(t//10)//2][(t//10)%2]
+            axes.bar(range(len(ratios)), ratios)
+            axes.set_title(f"t = {t}")
+            axes.set_xticks(range(len(ratios)))
+            axes.set_xlabel('Layer ID')
+            axes.set_ylabel('Set intersection ratio')
+            axes.set_ylim(0.8, 1.0)
+            plt.savefig(os.path.join(args[i].save_path, f'set_difference.png'))
+
                 
 if __name__ == "__main__":
     main()
