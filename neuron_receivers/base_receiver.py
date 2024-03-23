@@ -1,15 +1,25 @@
 import torch
 import numpy as np
 from diffusers.models.activations import GEGLU
+from diffusers.pipelines.stable_diffusion import safety_checker
+
+def sc(self, clip_input, images):
+    return images, [False for i in images]
 
 class BaseNeuronReceiver:
     '''
     This is the base class for storing and changing activation functions
     '''
-    def __init__(self, seed = 0):
+    def __init__(self, seed = 0, keep_nsfw = False):
         self.seed = seed
         self.gates = []
         self.hidden_states = []
+        self.keep_nsfw = keep_nsfw
+        if self.keep_nsfw:
+            print("Removing safety checker")
+            safety_checker.StableDiffusionSafetyChecker.forward = sc
+        self.safety_checker = safety_checker.StableDiffusionSafetyChecker
+        
     
     def hook_fn(self, module, input, output):
         # custom hook function
@@ -40,7 +50,7 @@ class BaseNeuronReceiver:
         #  fix seed to get the same output for every run
         torch.manual_seed(self.seed)
         np.random.seed(self.seed)
-        out = model(ann).images[0]
+        out = model(ann, safety_checker=self.safety_checker).images[0]
 
         # remove the hook
         self.remove_hooks(hooks)

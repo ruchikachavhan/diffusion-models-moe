@@ -47,8 +47,8 @@ def main():
             expert_counter[t][ffn_name] = [0] * num_experts_per_ffn[ffn_name]
 
     for img, ann in tqdm.tqdm(zip(imgs, anns)):
-        if iter > 5 and args.dbg:
-            break
+        # if iter > 5 and args.dbg:
+        #     break
         print("text: ", ann)
         # fix seed
         torch.manual_seed(args.seed)
@@ -65,7 +65,7 @@ def main():
         
         iter += 1
 
-    print(expert_counter)
+    # print(expert_counter)
     # # save the expert counter
     topk_experts = args.moefication['topk_experts']
     with open(os.path.join(args.save_path, f'expert_counter_{topk_experts}.json'), 'w') as f:

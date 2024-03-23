@@ -6,8 +6,8 @@ import utils
 
 
 class NeuronPredictivity(BaseNeuronReceiver):
-    def __init__(self, seed, T, n_layers):
-        super(NeuronPredictivity, self).__init__(seed)
+    def __init__(self, seed, T, n_layers, keep_nsfw=False):
+        super(NeuronPredictivity, self).__init__(seed, keep_nsfw)
         self.T = T
         self.n_layers = n_layers
         self.predictivity = utils.StatMeter(T, n_layers)

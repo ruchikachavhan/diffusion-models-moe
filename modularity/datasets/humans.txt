@@ -1,0 +1,8 @@
+man
+woman
+girl 
+boy
+child
+couple
+person
+human

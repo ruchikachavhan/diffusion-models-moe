@@ -8,8 +8,8 @@ dataset:
   path: '../COCO-vqa'
 inference:
   batch_size: 1
-  num_images: 10000
-seed: 1
+  num_images: 30
+seed: 0
 res_path: 'results/stable-diffusion'
 model_id: 'runwayml/stable-diffusion-v1-5'
 n_layers: 16

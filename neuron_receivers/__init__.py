@@ -4,6 +4,7 @@ from neuron_receivers.frequency_measure import FrequencyMeasure
 from neuron_receivers.moefy import MOEFy
 from neuron_receivers.predictivity import NeuronPredictivity
 from neuron_receivers.save_states import SaveStates
-from neuron_receivers.remove_skilled_experts import NeuronSpecialisation
+from neuron_receivers.remove_skilled_experts import RemoveExperts
+from neuron_receivers.remove_skilled_neurons import RemoveNeurons
 from neuron_receivers.neuron_predictivity_bb import NeuronPredictivityBB
 from neuron_receivers.get_experts import GetExperts

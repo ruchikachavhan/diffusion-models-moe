@@ -2,10 +2,23 @@ import json
 import os
 import sys
 import tqdm
+from mod_utils import get_prompts
 sys.path.append(os.getcwd())
 import utils
 from neuron_receivers import NeuronPredictivity, NeuronPredictivityBB
 
+def get_neuron_receivers(args, num_geglu):
+     # Neuron receiver with forward hooks to measure predictivity
+    if args.modularity['bounding_box']:
+        neuron_receiver = NeuronPredictivityBB
+    else:
+        neuron_receiver = NeuronPredictivity
+    neuron_pred_base = neuron_receiver(args.seed, args.timesteps, 
+                                       num_geglu, keep_nsfw = args.modularity['keep_nsfw'])
+    neuron_pred_adj = neuron_receiver(args.seed, args.timesteps, num_geglu, 
+                                      keep_nsfw = args.modularity['keep_nsfw'])
+    
+    return neuron_pred_base, neuron_pred_adj
 
 def main():
     args = utils.Config('experiments/mod_config.yaml', 'modularity')
@@ -15,37 +28,23 @@ def main():
     model, num_geglu = utils.get_sd_model(args)
     model = model.to(args.gpu)
 
-    # Neuron receiver with forward hooks to measure predictivity
-    if args.modularity['bounding_box']:
-        neuron_pred_base = NeuronPredictivityBB(args.seed, args.timesteps, num_geglu)
-        neuron_pred_adj = NeuronPredictivityBB(args.seed, args.timesteps, num_geglu)
-    else:
-        neuron_pred_base = NeuronPredictivity(args.seed, args.timesteps, num_geglu)
-        neuron_pred_adj = NeuronPredictivity(args.seed, args.timesteps, num_geglu)
-
+    # Neuron receiver
+    neuron_pred_base, neuron_pred_adj = get_neuron_receivers(args, num_geglu)
+   
     # Test the model
     if args.fine_tuned_unet is not None:
         neuron_pred_base.test(model)
         neuron_pred_adj.test(model)
         print("Neuron receiver tests passed")
 
-    # Dataset from things.txt
-    # read things.txt
-    with open('modularity/things.txt', 'r') as f:
-        objects = f.readlines()
-    base_prompts = [f'a {thing.strip()}' for thing in objects]
-    # add an adjective of choice to every element in things list
-    adjectives = args.modularity['adjective']
-    adj_prompts = [f'a {adjectives} {thing}' for thing in objects]
+    base_prompts, adj_prompts, _ = get_prompts(args)
 
     if args.modularity['bounding_box']:
         # read bounding box coordinates
         with open(os.path.join(args.save_path, 'bb_coordinates_layer_adj.json')) as f:
             bb_coordinates_layer_adj = json.load(f)
-            print(bb_coordinates_layer_adj.keys())
         with open(os.path.join(args.save_path, 'bb_coordinates_layer_base.json')) as f:
             bb_coordinates_layer_base = json.load(f)
-            print(bb_coordinates_layer_base.keys())
 
     iter = 0
 
@@ -62,11 +61,13 @@ def main():
         print("text: ", ann, ann_adj)
         
         neuron_pred_base.reset_time_layer()
-        out, _ = neuron_pred_base.observe_activation(model, ann, bboxes=bb_coordinates_layer_base[ann] if args.modularity['bounding_box'] else None)
+        out, _ = neuron_pred_base.observe_activation(model, ann,
+                                                    bboxes=bb_coordinates_layer_base[ann] if args.modularity['bounding_box'] else None)
 
         neuron_pred_adj.reset_time_layer()
-        ann_adj = ann_adj.split('\n')[0]
-        out_adj, _ = neuron_pred_adj.observe_activation(model, ann_adj, bboxes=bb_coordinates_layer_adj[ann_adj] if args.modularity['bounding_box'] else None)
+        # ann_adj = ann_adj.split('\n')[0]
+        out_adj, _ = neuron_pred_adj.observe_activation(model, ann_adj, 
+                                                    bboxes=bb_coordinates_layer_adj[ann_adj] if args.modularity['bounding_box'] else None)
 
         for t in range(args.timesteps):
             for l in range(args.n_layers):
@@ -84,22 +85,12 @@ def main():
 
     # save results
     print("Saving results")
-    if args.modularity['bounding_box']:
-        neuron_pred_adj.predictivity.save(os.path.join(args.save_path, 'predictivity_adj_bb.json'))
-        neuron_pred_base.predictivity.save(os.path.join(args.save_path, 'predictivity_base_bb.json'))
-        # save diff_std
-        with open(os.path.join(args.save_path, 'diff_std_bb.json'), 'w') as f:
-            json.dump(diff_std, f)
-    else:
-        neuron_pred_adj.predictivity.save(os.path.join(args.save_path, 'predictivity_adj.json'))
-        neuron_pred_base.predictivity.save(os.path.join(args.save_path, 'predictivity_base.json'))
-        # save diff_std
-    
-        # save diff_std
-        with open(os.path.join(args.save_path, 'diff_std.json'), 'w') as f:
-            json.dump(diff_std, f)
-
-
+    save_type = 'bb' if args.modularity['bounding_box'] else ''
+    neuron_pred_adj.predictivity.save(os.path.join(args.save_path, f'predictivity_adj{save_type}.json'))
+    neuron_pred_base.predictivity.save(os.path.join(args.save_path, f'predictivity_base{save_type}.json'))
+    # save diff_std
+    with open(os.path.join(args.save_path, f'diff_std{save_type}.json'), 'w') as f:
+        json.dump(diff_std, f)
 
 
 if __name__ == "__main__":

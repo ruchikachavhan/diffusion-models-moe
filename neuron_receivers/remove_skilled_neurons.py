@@ -6,9 +6,9 @@ from diffusers.models.activations import GEGLU
 from neuron_receivers.base_receiver import BaseNeuronReceiver
 from neuron_receivers.predictivity import NeuronPredictivity
 
-class RemoveExperts(NeuronPredictivity):
+class RemoveNeurons(NeuronPredictivity):
     def __init__(self, seed, path_expert_indx, T, n_layers, keep_nsfw=False):
-        super(RemoveExperts, self).__init__(seed, T, n_layers, keep_nsfw)
+        super(RemoveNeurons, self).__init__(seed, T, n_layers, keep_nsfw)
         self.expert_indices = {}
         for i in range(0, T):
             self.expert_indices[i] = {}
@@ -27,23 +27,10 @@ class RemoveExperts(NeuronPredictivity):
         gate = module.gelu(gate)
 
         expert_indx = self.expert_indices[self.timestep][self.layer]
+        # remove those neurons from gate
         if len(expert_indx) > 0:
-                patterns = module.patterns.clone()
-                patterns[expert_indx, :] = 0
-
-        else:
-            patterns = module.patterns.clone()
-
-        if module.patterns is not None:
-            k = module.k
-            bsz, seq_len, hidden_size = gate.shape
-            gate_gelu = gate.clone()
-            gate_gelu = gate_gelu.view(-1, hidden_size)
-            score = torch.matmul(gate_gelu, patterns.transpose(0, 1))
-
-            labels = torch.topk(score, k=k, dim=-1)[1].view(bsz, seq_len, k)
-            cur_mask = torch.nn.functional.embedding(labels, patterns).sum(-2)
-            gate[cur_mask == 0] = 0
+            indx = torch.where(torch.tensor(expert_indx) == 1)[0]
+            gate[:, :, indx] = 0
 
         self.update_time_layer()
 

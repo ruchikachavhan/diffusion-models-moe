@@ -1,0 +1,7 @@
+road
+city
+park
+highway
+land
+globe
+street

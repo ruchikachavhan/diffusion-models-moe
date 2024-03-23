@@ -5,6 +5,7 @@ results_seed_3/*
 results_seed_4/*
 results_seed_5/*
 results_all_seeds/*
+backup_results/*
 compare_models_results/*
 *.png
 __pycache__/
@@ -16,3 +17,6 @@ test_images/*
 sparsity/__pycache__
 moefication/__pycache__
 modularity/__pycache__
+bounding_boxes/__pycache__
+neuron_receivers/__pycache__
+*.ttf

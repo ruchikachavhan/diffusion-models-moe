@@ -4,7 +4,7 @@ moefication:
   templates: '%s.%s.attentions.%s.transformer_blocks.0.ff.net.0.proj.weight'
   topk_experts: 1.0
 modularity:
-  adjective: 'white'
+  adjective: 'black'
   margin: 0.05
   condition:
     name: 'greater'
@@ -12,6 +12,7 @@ modularity:
     base_prompts: 'predictivity_base_bb.json'
     concept_prompts: 'predictivity_adj_bb.json'
   bounding_box: true
+  single_sample_test: false
 dataset:
   path: '../COCO-vqa'
 inference:

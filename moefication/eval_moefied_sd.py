@@ -56,11 +56,6 @@ def main():
         out = model(ann).images[0]
         # With MOEfication
         out_moe, _ = moefier.observe_activation(model, ann)
-
-        if iter < 10:
-            out.save(os.path.join(args.moefication['img_save_path'], f'original_{iter}.png'))
-            out_moe.save(os.path.join(args.moefication['img_save_path'], f'moe_{iter}.png'))
-
         # Collect images
         orig_imgs.append(transform(Image.open(img).convert('RGB')))
         non_moe_imgs.append(transform(out.convert('RGB')))

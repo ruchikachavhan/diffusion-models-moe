@@ -52,7 +52,7 @@ def main():
             adj_avg = np.array(adj_prompt_pred[str(i)]['avg'])
             adj_std = np.array(adj_prompt_pred[str(i)]['std'])
             # max standard deviation of base and adj predictivity is the margin
-            is_greater = adj_avg > base_avg + base_std
+            is_greater = adj_avg > base_avg + base_std*0.5
             
             avg_exp_pred = [] # list will store expert specialisation score for a layer
             # cluster neurons into experts

@@ -1,15 +1,14 @@
-moefication:
-  name: Moefication
-  expert_size: 20
-  templates: '%s.%s.attentions.%s.transformer_blocks.0.ff.net.0.proj.weight'
-  topk_experts: 1.0
+moefication: null
 modularity:
-  adjective: 'white'
-  margin: 0.05
+  adjective: 'on the street'
+  file_name: 'things'
+  keep_nsfw: false
+  concept_removal: false
   condition:
-    name: 'moefy_compare'
-    skill_ratio: 0.5
-  bounding_box: true
+    name: 't_test'
+    skill_ratio: 0.2
+  bounding_box: false
+  single_sample_test: false
 dataset:
   path: '../COCO-vqa'
 inference:
@@ -19,9 +18,9 @@ res_path: 'results/stable-diffusion'
 model_id: 'runwayml/stable-diffusion-v1-5'
 n_layers: 16
 fine_tuned_unet: '../diffusers/examples/text_to_image/relufied-stable-diffusion-v1-5/checkpoint-14000/'
-gpu: 1
+gpu: 7
 seed: 0
-default_eval_seed: 0
+default_eval_seed: 42
 timesteps: 51
 dbg: false
   

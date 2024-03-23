@@ -1,18 +1,17 @@
-moefication:
-  name: Moefication
-  expert_size: 20
-  templates: '%s.%s.attentions.%s.transformer_blocks.0.ff.net.0.proj.weight'
-  topk_experts: 1.0
+moefication: null
 modularity:
-  adjective: 'white'
-  margin: 0.05
+  adjective: 'under a tree'
+  file_name: 'things'
+  keep_nsfw: false
+  concept_removal: true
   condition:
     name: 't_test'
-    skill_ratio: 0.5
-    base_prompts: 'predictivity_base_bb.json'
-    concept_prompts: 'predictivity_adj_bb.json'
-    diff_std: 'diff_std_bb.json'
-  bounding_box: true
+    skill_ratio: 0.2
+    base_prompts: 'predictivity_base.json'
+    concept_prompts: 'predictivity_adj.json'
+    diff_std: 'diff_std.json'
+  bounding_box: false
+  single_sample_test: false
 dataset:
   path: '../COCO-vqa'
 inference:
