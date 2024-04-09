@@ -11,6 +11,7 @@ sys.path.append('sparsity')
 from diffusers.models.activations import GEGLU, GELU
 from diffusers import UNet2DConditionModel, DiffusionPipeline, LCMScheduler
 from relufy_model import find_and_change_geglu
+from transformers.models.clip.modeling_clip import CLIPMLP
 
 def make_dirs(args):
     if not os.path.exists('test_images'):
@@ -125,9 +126,9 @@ class Config:
             setattr(self, key, value)
         
         if self.seed!='all':
-            self.res_path = f'results/results_seed_{self.seed}' + '/' + self.res_path.split('/')[1]
+            self.res_path = f'results_skilled_CLIP/results_seed_{self.seed}' + '/' + self.res_path.split('/')[1]
         elif self.seed == 'all':
-            self.res_path = 'results/results_all_seeds' + '/' + self.res_path.split('/')[1]
+            self.res_path = 'results_skilled_CLIP/results_all_seeds' + '/' + self.res_path.split('/')[1]
             self.seed = self.default_eval_seed
     
         # change result directory

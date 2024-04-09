@@ -38,8 +38,9 @@ class BaseNeuronReceiver:
 
         # hook the model
         num_modules = 0
-        for name, module in model.unet.named_modules():
-            if isinstance(module, self.replace_fn) and 'ff.net' in name:
+        for name, module in model.text_encoder.named_modules():
+            print(name)
+            if isinstance(module, self.replace_fn) and 'mlp' in name:
                 hook = module.register_forward_hook(self.hook_fn)
                 num_modules += 1
                 hooks.append(hook)

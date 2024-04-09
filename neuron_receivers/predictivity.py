@@ -3,6 +3,7 @@ import numpy as np
 from diffusers.models.activations import GEGLU, GELU
 from neuron_receivers.base_receiver import BaseNeuronReceiver
 import utils
+from torch.nn.functional import relu
 
 
 class NeuronPredictivity(BaseNeuronReceiver):

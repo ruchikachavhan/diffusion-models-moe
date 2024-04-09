@@ -1,7 +1,7 @@
 moefication: null
 modularity:
-  adjective: 'Van Gogh'
-  file_name: 'things'
+  adjective: 'white'
+  file_name: 'animals'
   keep_nsfw: true
   concept_removal: false
   predictvity_for: 'neuron'
@@ -25,23 +25,23 @@ inference:
 # default_eval_seed: 42
 # timesteps: 4
 # dbg: false
-# res_path: 'results/stable-diffusion'
-# model_id: 'runwayml/stable-diffusion-v1-5'
-# n_layers: 16
-# # fine_tuned_unet: null
-# fine_tuned_unet: '../diffusers/examples/text_to_image/relufied-stable-diffusion-v1-5/checkpoint-14000/'
-# gpu: 7
-# seed: 0
-# default_eval_seed: 42
-# timesteps: 51
-# dbg: false
-res_path: 'results/pixart-alpha'
-model_id: "PixArt-alpha/PixArt-XL-2-512x512"
-n_layers: 28
-fine_tuned_unet: null
+res_path: 'results/stable-diffusion'
+model_id: 'runwayml/stable-diffusion-v1-5'
+n_layers: 16
+# fine_tuned_unet: null
+fine_tuned_unet: '../diffusers/examples/text_to_image/relufied-stable-diffusion-v1-5/checkpoint-14000/'
 gpu: 7
 seed: 0
 default_eval_seed: 42
-timesteps: 20
+timesteps: 51
 dbg: false
+# res_path: 'results/pixart-alpha'
+# model_id: "PixArt-alpha/PixArt-XL-2-512x512"
+# n_layers: 28
+# fine_tuned_unet: null
+# gpu: 7
+# seed: 0
+# default_eval_seed: 42
+# timesteps: 20
+# dbg: false
   
