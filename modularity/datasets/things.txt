@@ -13,7 +13,7 @@ horse
 bird
 flower
 bowl
-paper
+bottle
 wall
 building
 chicken

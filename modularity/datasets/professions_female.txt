@@ -1,0 +1,8 @@
+nurse
+receptionist
+fashion designer
+baby sitter
+student
+hair dresser
+secretary
+housekeeper

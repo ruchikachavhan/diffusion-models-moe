@@ -6,7 +6,10 @@ import torch
 import json
 from diffusers import AutoPipelineForText2Image
 from diffusers import StableDiffusionPipeline, UNet2DConditionModel
+from diffusers import PixArtAlphaPipeline
 sys.path.append('sparsity')
+from diffusers.models.activations import GEGLU, GELU
+from diffusers import UNet2DConditionModel, DiffusionPipeline, LCMScheduler
 from relufy_model import find_and_change_geglu
 
 def make_dirs(args):
@@ -72,10 +75,31 @@ def get_sd_model(args):
             model = StableDiffusionPipeline.from_pretrained(args.model_id, torch_dtype=torch.float16)
         num_geglu = args.n_layers
 
+        replace_fn = GEGLU
+
     elif 'xl-base-1.0' in args.model_id:
         model = AutoPipelineForText2Image.from_pretrained(args.model_id, torch_dtype=torch.float32)
+    
+    elif 'PixArt-alpha' in args.model_id:
+        model = PixArtAlphaPipeline.from_pretrained("PixArt-alpha/PixArt-XL-2-512x512", torch_dtype=torch.float16)
+        model.enable_model_cpu_offload()
+        num_geglu = 28
+        # HACK, make a unet module in the model
+        model.unet = model.transformer
+        replace_fn = GELU
+    
+    elif 'lcm-sdxl' in args.model_id:
+        unet = UNet2DConditionModel.from_pretrained("latent-consistency/lcm-sdxl", torch_dtype=torch.float16, variant="fp16")
+        model = DiffusionPipeline.from_pretrained("stabilityai/stable-diffusion-xl-base-1.0", unet=unet, torch_dtype=torch.float16, variant="fp16")
+        model.scheduler = LCMScheduler.from_config(model.scheduler.config)
+        num_geglu = 0
+        for name, module in model.unet.named_modules():
+            if 'ff.net' in name and isinstance(module, GEGLU):
+                num_geglu += 1
+        replace_fn = GEGLU
+        print("Number of GEGLU layers", num_geglu)
 
-    return model, num_geglu
+    return model, num_geglu, replace_fn
 
 def coco_dataset(data_path, split, num_images=1000):
     with open(os.path.join(data_path, f'annotations/captions_{split}2014.json')) as f:
@@ -136,6 +160,9 @@ class Config:
                 elif self.modularity['condition']['name'] == 'moefy_compare':
                     topk_experts = self.moefication['topk_experts']
                     self.modularity['skill_expert_path'] = os.path.join(self.save_path, prefix, f'skilled_expert_{condition}', str(topk_experts))
+                    self.modularity['skill_neuron_path'] = None
+                elif self.modularity['condition']['name'] in ['t_test_expert', 't_test_moefy_compare', 't_test_t_test_expert', 't_test_expert_moefy_compare', 't_test_intersection', 't_test_union', 't_test_expert_union']:
+                    self.modularity['skill_expert_path'] = os.path.join(self.save_path, prefix, f'skilled_expert_{condition}', str(ratio))
                     self.modularity['skill_neuron_path'] = None
 
                 if self.modularity['bounding_box']:

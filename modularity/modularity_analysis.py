@@ -3,19 +3,25 @@ import os
 import sys
 import tqdm
 from mod_utils import get_prompts
+sys.path.append('moefication')
+from helper import modify_ffn_to_experts
 sys.path.append(os.getcwd())
 import utils
-from neuron_receivers import NeuronPredictivity, NeuronPredictivityBB
+from neuron_receivers import NeuronPredictivity, NeuronPredictivityBB, ExpertPredictivity
 
 def get_neuron_receivers(args, num_geglu):
      # Neuron receiver with forward hooks to measure predictivity
-    if args.modularity['bounding_box']:
-        neuron_receiver = NeuronPredictivityBB
+    if args.modularity['predictvity_for'] == 'expert':
+        neuron_receiver = ExpertPredictivity
     else:
-        neuron_receiver = NeuronPredictivity
+        if args.modularity['bounding_box']:
+            neuron_receiver = NeuronPredictivityBB
+        else:
+            neuron_receiver = NeuronPredictivity
     neuron_pred_base = neuron_receiver(args.seed, args.timesteps, 
-                                       num_geglu, keep_nsfw = args.modularity['keep_nsfw'])
-    neuron_pred_adj = neuron_receiver(args.seed, args.timesteps, num_geglu, 
+                                       num_geglu, replace_fn = args.replace_fn,
+                                       keep_nsfw = args.modularity['keep_nsfw'])
+    neuron_pred_adj = neuron_receiver(args.seed, args.timesteps, num_geglu, replace_fn = args.replace_fn,
                                       keep_nsfw = args.modularity['keep_nsfw'])
     
     return neuron_pred_base, neuron_pred_adj
@@ -25,9 +31,17 @@ def main():
     args.configure('modularity')
 
     # Model
-    model, num_geglu = utils.get_sd_model(args)
+    model, num_geglu, replace_fn = utils.get_sd_model(args)
+    args.replace_fn = replace_fn
+    print("Replce fn: ", replace_fn)
     model = model.to(args.gpu)
 
+    if args.modularity['predictvity_for'] == 'expert':
+        args.moefication = {}
+        args.moefication['topk_experts'] = 1.0
+        model, ffn_names_list, num_experts_per_ffn = modify_ffn_to_experts(model, args)
+    
+    
     # Neuron receiver
     neuron_pred_base, neuron_pred_adj = get_neuron_receivers(args, num_geglu)
    
@@ -86,6 +100,9 @@ def main():
     # save results
     print("Saving results")
     save_type = 'bb' if args.modularity['bounding_box'] else ''
+    save_type = save_type + '_expert' if args.modularity['predictvity_for'] == 'expert' else save_type
+    print(save_type)
+    print(neuron_pred_adj.predictivity)
     neuron_pred_adj.predictivity.save(os.path.join(args.save_path, f'predictivity_adj{save_type}.json'))
     neuron_pred_base.predictivity.save(os.path.join(args.save_path, f'predictivity_base{save_type}.json'))
     # save diff_std

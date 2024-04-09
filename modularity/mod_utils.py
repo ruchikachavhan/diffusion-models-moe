@@ -15,8 +15,9 @@ def get_prompts(args):
     if len(adjectives) == 1:
         base_prompts = [f'a {thing}' for thing in things]
 
-        if adjectives[0] in ['white', 'black']:
+        if adjectives[0] in ['white', 'black', 'jumping', 'running']:
             # simply add the adjective before the thing
+            base_prompts = [f'a {thing}' for thing in things]
             adj_prompts = [f'a {adjectives[0]} {thing}' for thing in things]
 
         elif adjectives[0] in ['under a tree', 'on a table', 'behind a tree', 'on the left of a tree', 'near a tree', 'in a room', 'on the street']:
@@ -32,16 +33,37 @@ def get_prompts(args):
             base_prompts = [f'a photo of a {thing}' for thing in things]
             adj_prompts = [f'a photo of a {adjectives[0]} {thing} carcass' for thing in things]
             args.modularity['condition']['is_nsfw'] = True
+            args.modularity['keep_nsfw'] = True
             
         elif adjectives[0] in ['naked']:
             base_prompts = [f'a photo of a {thing}' for thing in things]
             adj_prompts = [f'a photo of a {adjectives[0]} {thing}' for thing in things]
             args.modularity['condition']['is_nsfw'] = True
+            args.modularity['keep_nsfw'] = True
+        
+        elif adjectives[0] in ['Van Gogh', 'Monet', 'Greg Rutkowski', 'Jeremy Mann', 'Salvador Dali', 'Pablo Picasso', 'manga']:
+            base_prompts = [f'a photo of a {thing}' for thing in things]
+            adj_prompts = [f'a {thing} in the style of {adjectives[0]}' for thing in things]
+
+        elif adjectives[0] in ['gender']:
+            base_prompts = [f'a photo of a {thing}' for thing in things]
+            adj_prompts = [f'a photo of a {thing}' for thing in things]
+
+        elif adjectives[0] in ['scene_removal_cat']:
+            base_prompts = [f'a {thing}' for thing in things]
+            adj_prompts = [f'a {thing} with a cat' for thing in things]
 
     elif len(adjectives) == 2:
         # consider the first adjective as base prompt
-        base_prompts = [f'a {adjectives[0]} {thing}' for thing in things]
-        adj_prompts = [f'a {adjectives[1]} {thing}' for thing in things]
+        if adjectives[0] in ['white', 'black']:
+            base_prompts = [f'a {adjectives[0]} {thing}' for thing in things]
+            adj_prompts = [f'a {adjectives[1]} {thing}' for thing in things]
+        elif adjectives[0] in ['under a tree', 'on the street'] and adjectives[1] != 'painting' :
+            base_prompts = [f'a {thing} {adjectives[1]}' for thing in things]
+            adj_prompts = [f'a {thing} {adjectives[0]} {adjectives[1]}' for thing in things]
+        elif adjectives[0] in ['under a tree', 'on the street'] and adjectives[1] == 'painting':
+            base_prompts = [f'a photo of a {thing}' for thing in things]
+            adj_prompts = [f'a painting of a {thing} {adjectives[0]}' for thing in things]
     else:
         raise ValueError("Only 1 or 2 adjectives are allowed")
 

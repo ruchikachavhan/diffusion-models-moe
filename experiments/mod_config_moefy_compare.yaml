@@ -1,9 +1,9 @@
 moefication: null
 modularity:
-  adjective: 'on a table'
+  adjective: 'bloody red'
   margin: 0.05
-  file_name: 'things'
-  keep_nsfw: false
+  file_name: 'animals'
+  keep_nsfw: true
   concept_removal: true
   condition:
     name: 'moefy_compare'

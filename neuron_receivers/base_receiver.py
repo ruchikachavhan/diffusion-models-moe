@@ -1,6 +1,6 @@
 import torch
 import numpy as np
-from diffusers.models.activations import GEGLU
+from diffusers.models.activations import GEGLU, GELU
 from diffusers.pipelines.stable_diffusion import safety_checker
 
 def sc(self, clip_input, images):
@@ -10,15 +10,17 @@ class BaseNeuronReceiver:
     '''
     This is the base class for storing and changing activation functions
     '''
-    def __init__(self, seed = 0, keep_nsfw = False):
+    def __init__(self, seed = 0, replace_fn = GEGLU, keep_nsfw = False):
         self.seed = seed
         self.gates = []
         self.hidden_states = []
         self.keep_nsfw = keep_nsfw
+        print("Keep nsfw: ", keep_nsfw)
         if self.keep_nsfw:
             print("Removing safety checker")
             safety_checker.StableDiffusionSafetyChecker.forward = sc
         self.safety_checker = safety_checker.StableDiffusionSafetyChecker
+        self.replace_fn = replace_fn
         
     
     def hook_fn(self, module, input, output):
@@ -37,7 +39,7 @@ class BaseNeuronReceiver:
         # hook the model
         num_modules = 0
         for name, module in model.unet.named_modules():
-            if isinstance(module, GEGLU) and 'ff.net' in name:
+            if isinstance(module, self.replace_fn) and 'ff.net' in name:
                 hook = module.register_forward_hook(self.hook_fn)
                 num_modules += 1
                 hooks.append(hook)
@@ -50,6 +52,7 @@ class BaseNeuronReceiver:
         #  fix seed to get the same output for every run
         torch.manual_seed(self.seed)
         np.random.seed(self.seed)
+        # out = model(ann, safety_checker=self.safety_checker, num_inference_steps=4, guidance_scale=8.0).images[0]
         out = model(ann, safety_checker=self.safety_checker).images[0]
 
         # remove the hook

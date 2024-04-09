@@ -1,7 +1,12 @@
 road
-city
+garden
+beach
+room
 park
-highway
-land
-globe
 street
+shelter
+chair
+table
+bag
+tree
+forest

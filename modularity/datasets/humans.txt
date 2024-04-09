@@ -4,5 +4,15 @@ girl
 boy
 child
 couple
-person
-human
+guy
+doctor
+nurse
+teacher
+lawyer
+mother
+father
+kid
+professor
+student
+group of friends
+celebrity

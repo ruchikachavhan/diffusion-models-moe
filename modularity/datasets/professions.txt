@@ -1,0 +1,18 @@
+doctor
+nurse
+teacher
+lawyer
+professor
+student
+president
+CEO
+hair dresser
+secretary
+house keeper
+manager
+baker
+librarian
+cleaner
+cook
+salesperson
+attendant

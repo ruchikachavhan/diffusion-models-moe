@@ -29,8 +29,11 @@ class RemoveExperts(NeuronPredictivity):
         expert_indx = self.expert_indices[self.timestep][self.layer]
         if len(expert_indx) > 0:
                 patterns = module.patterns.clone()
-                patterns[expert_indx, :] = 0
-
+                if self.timestep < 20:
+                    patterns[expert_indx, :] = 0
+                # select random indeices
+                # random_indices = np.random.choice(np.arange(0, patterns.shape[0]), len(expert_indx), replace=False)
+                # patterns[random_indices, :] = 0
         else:
             patterns = module.patterns.clone()
 

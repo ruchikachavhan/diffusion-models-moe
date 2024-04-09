@@ -8,12 +8,8 @@ bird
 chicken
 duck
 deer
-cockroach
-insect
-fish
-cow
 pig
 pigeon
-calf
 sheep
-
+goat
+frog

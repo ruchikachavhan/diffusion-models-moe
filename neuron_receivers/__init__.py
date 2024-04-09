@@ -8,3 +8,5 @@ from neuron_receivers.remove_skilled_experts import RemoveExperts
 from neuron_receivers.remove_skilled_neurons import RemoveNeurons
 from neuron_receivers.neuron_predictivity_bb import NeuronPredictivityBB
 from neuron_receivers.get_experts import GetExperts
+from neuron_receivers.expert_activation import ExpertPredictivity
+from neuron_receivers.add_skilled_experts import AddExperts

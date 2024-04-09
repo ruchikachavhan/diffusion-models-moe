@@ -1,13 +1,13 @@
 import torch
 import numpy as np
-from diffusers.models.activations import GEGLU
+from diffusers.models.activations import GEGLU, GELU
 from neuron_receivers.base_receiver import BaseNeuronReceiver
 import utils
 
 
 class NeuronPredictivity(BaseNeuronReceiver):
-    def __init__(self, seed, T, n_layers, keep_nsfw=False):
-        super(NeuronPredictivity, self).__init__(seed, keep_nsfw)
+    def __init__(self, seed, T, n_layers, replace_fn = GEGLU, keep_nsfw=False):
+        super(NeuronPredictivity, self).__init__(seed, replace_fn, keep_nsfw)
         self.T = T
         self.n_layers = n_layers
         self.predictivity = utils.StatMeter(T, n_layers)
@@ -19,9 +19,10 @@ class NeuronPredictivity(BaseNeuronReceiver):
         
         self.timestep = 0
         self.layer = 0
+        self.replace_fn = replace_fn
     
     def update_time_layer(self):
-        if self.layer == 15:
+        if self.layer == self.n_layers - 1:
             self.layer = 0
             self.timestep += 1
         else:
@@ -40,22 +41,32 @@ class NeuronPredictivity(BaseNeuronReceiver):
     def hook_fn(self, module, input, output):
         # save the out
         args = (1.0,)
-        hidden_states, gate = module.proj(input[0], *args).chunk(2, dim=-1)
-        # gate is of the shape (bs, seq len, hidden size). During evaluation batch size is 1
-        # so we can reshape it to (seq len, hidden size) and take the max activation over entire sequence
-        max_act = torch.max(module.gelu(gate).view(-1, gate.shape[-1]), dim=0)[0]
-        self.max_gate[self.timestep][self.layer] = max_act.detach().cpu().numpy()
+        if self.replace_fn == GEGLU:
+            hidden_states, gate = module.proj(input[0], *args).chunk(2, dim=-1)
+            # gate is of the shape (bs, seq len, hidden size). During evaluation batch size is 1
+            # so we can reshape it to (seq len, hidden size) and take the max activation over entire sequence
+            max_act = torch.max(module.gelu(gate).view(-1, gate.shape[-1]), dim=0)[0]
+            self.max_gate[self.timestep][self.layer] = max_act.detach().cpu().numpy()
+            self.predictivity.update(max_act.detach().cpu().numpy(), self.timestep, self.layer)
+            self.update_time_layer()
+            return hidden_states * module.gelu(gate)
+        else:
+            hidden_states = module.proj(input[0])
+            hidden_states = module.gelu(hidden_states)
+            max_act = torch.mean(hidden_states.view(-1, hidden_states.shape[-1]), dim=0)
+            self.max_gate[self.timestep][self.layer] = max_act.detach().cpu().numpy()
+            self.predictivity.update(max_act.detach().cpu().numpy(), self.timestep, self.layer)
+            
+            self.update_time_layer()
+            return hidden_states
+        
 
-        self.predictivity.update(max_act.detach().cpu().numpy(), self.timestep, self.layer)
-        self.update_time_layer()
-        return hidden_states * module.gelu(gate)
-    
     def test(self, model, ann = 'A brown dog in the snow'):
         # hook the model
         hooks = []
         num_modules = 0
         for name, module in model.unet.named_modules():
-            if isinstance(module, GEGLU) and 'ff.net' in name:
+            if isinstance(module, self.replace_fn) and 'ff.net' in name:
                 hook = module.register_forward_hook(self.hook_fn)
                 num_modules += 1
                 hooks.append(hook)

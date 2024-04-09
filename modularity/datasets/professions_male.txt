@@ -1,0 +1,10 @@
+doctor
+teacher
+lawyer
+professor
+president
+CEO
+manager
+librarian
+salesperson
+attendant
