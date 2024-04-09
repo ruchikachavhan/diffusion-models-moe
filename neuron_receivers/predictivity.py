@@ -39,26 +39,31 @@ class NeuronPredictivity(BaseNeuronReceiver):
     
     
     def hook_fn(self, module, input, output):
+        # get hidden state
+        hidden_states = module.fc1(input[0])
+        hidden_states = module.relu(hidden_states)
+        max_act = torch.mean(hidden_states.view(-1, hidden_states.shape[-1]), dim=0)
+        self.max_gate[self.timestep][self.layer] = max_act.detach().cpu().numpy()
         # save the out
-        args = (1.0,)
-        if self.replace_fn == GEGLU:
-            hidden_states, gate = module.proj(input[0], *args).chunk(2, dim=-1)
-            # gate is of the shape (bs, seq len, hidden size). During evaluation batch size is 1
-            # so we can reshape it to (seq len, hidden size) and take the max activation over entire sequence
-            max_act = torch.max(module.gelu(gate).view(-1, gate.shape[-1]), dim=0)[0]
-            self.max_gate[self.timestep][self.layer] = max_act.detach().cpu().numpy()
-            self.predictivity.update(max_act.detach().cpu().numpy(), self.timestep, self.layer)
-            self.update_time_layer()
-            return hidden_states * module.gelu(gate)
-        else:
-            hidden_states = module.proj(input[0])
-            hidden_states = module.gelu(hidden_states)
-            max_act = torch.mean(hidden_states.view(-1, hidden_states.shape[-1]), dim=0)
-            self.max_gate[self.timestep][self.layer] = max_act.detach().cpu().numpy()
-            self.predictivity.update(max_act.detach().cpu().numpy(), self.timestep, self.layer)
+        # args = (1.0,)
+        # if self.replace_fn == GEGLU:
+        #     hidden_states, gate = module.proj(input[0], *args).chunk(2, dim=-1)
+        #     # gate is of the shape (bs, seq len, hidden size). During evaluation batch size is 1
+        #     # so we can reshape it to (seq len, hidden size) and take the max activation over entire sequence
+        #     max_act = torch.max(module.gelu(gate).view(-1, gate.shape[-1]), dim=0)[0]
+        #     self.max_gate[self.timestep][self.layer] = max_act.detach().cpu().numpy()
+        #     self.predictivity.update(max_act.detach().cpu().numpy(), self.timestep, self.layer)
+        #     self.update_time_layer()
+        #     return hidden_states * module.gelu(gate)
+        # else:
+        #     hidden_states = module.proj(input[0])
+        #     hidden_states = module.gelu(hidden_states)
+        #     max_act = torch.mean(hidden_states.view(-1, hidden_states.shape[-1]), dim=0)
+        #     self.max_gate[self.timestep][self.layer] = max_act.detach().cpu().numpy()
+        #     self.predictivity.update(max_act.detach().cpu().numpy(), self.timestep, self.layer)
             
-            self.update_time_layer()
-            return hidden_states
+        #     self.update_time_layer()
+        #     return hidden_states
         
 
     def test(self, model, ann = 'A brown dog in the snow'):
