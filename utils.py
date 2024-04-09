@@ -11,6 +11,7 @@ sys.path.append('sparsity')
 from diffusers.models.activations import GEGLU, GELU
 from diffusers import UNet2DConditionModel, DiffusionPipeline, LCMScheduler
 from relufy_model import find_and_change_geglu
+from transformers.models.clip.modeling_clip import CLIPMLP
 
 def make_dirs(args):
     if not os.path.exists('test_images'):
@@ -75,7 +76,7 @@ def get_sd_model(args):
             model = StableDiffusionPipeline.from_pretrained(args.model_id, torch_dtype=torch.float16)
         num_geglu = args.n_layers
 
-        replace_fn = GEGLU
+        replace_fn = CLIPMLP
 
     elif 'xl-base-1.0' in args.model_id:
         model = AutoPipelineForText2Image.from_pretrained(args.model_id, torch_dtype=torch.float32)
@@ -86,7 +87,7 @@ def get_sd_model(args):
         num_geglu = 28
         # HACK, make a unet module in the model
         model.unet = model.transformer
-        replace_fn = GELU
+        replace_fn = CLIPMLP
     
     elif 'lcm-sdxl' in args.model_id:
         unet = UNet2DConditionModel.from_pretrained("latent-consistency/lcm-sdxl", torch_dtype=torch.float16, variant="fp16")
@@ -96,7 +97,7 @@ def get_sd_model(args):
         for name, module in model.unet.named_modules():
             if 'ff.net' in name and isinstance(module, GEGLU):
                 num_geglu += 1
-        replace_fn = GEGLU
+        replace_fn = CLIPMLP
         print("Number of GEGLU layers", num_geglu)
 
     return model, num_geglu, replace_fn
@@ -125,9 +126,9 @@ class Config:
             setattr(self, key, value)
         
         if self.seed!='all':
-            self.res_path = f'results/results_seed_{self.seed}' + '/' + self.res_path.split('/')[1]
+            self.res_path = f'results_skilled_CLIP/results_seed_{self.seed}' + '/' + self.res_path.split('/')[1]
         elif self.seed == 'all':
-            self.res_path = 'results/results_all_seeds' + '/' + self.res_path.split('/')[1]
+            self.res_path = 'results_skilled_CLIP/results_all_seeds' + '/' + self.res_path.split('/')[1]
             self.seed = self.default_eval_seed
     
         # change result directory

@@ -63,30 +63,26 @@ def main():
     iter = 0
 
     # initialise a standard deviation mesurement for difference in predictivities for concept and base prompt
-    diff_std = {}
-    for t in range(args.timesteps):
-        diff_std[t] = {}
-        for l in range(args.n_layers):
-            diff_std[t][l] = utils.StandardDev()
+    diff_std = utils.StandardDev()
 
     for ann, ann_adj in tqdm.tqdm(zip(base_prompts, adj_prompts)):
         if iter >= 5 and args.dbg:
             break
         print("text: ", ann, ann_adj)
         
-        neuron_pred_base.reset_time_layer()
+        # neuron_pred_base.reset_time_layer()
         out, _ = neuron_pred_base.observe_activation(model, ann,
                                                     bboxes=bb_coordinates_layer_base[ann] if args.modularity['bounding_box'] else None)
 
-        neuron_pred_adj.reset_time_layer()
+        # neuron_pred_adj.reset_time_layer()
         # ann_adj = ann_adj.split('\n')[0]
         out_adj, _ = neuron_pred_adj.observe_activation(model, ann_adj, 
                                                     bboxes=bb_coordinates_layer_adj[ann_adj] if args.modularity['bounding_box'] else None)
 
-        for t in range(args.timesteps):
-            for l in range(args.n_layers):
-                diff = neuron_pred_base.max_gate[t][l] - neuron_pred_adj.max_gate[t][l]
-                diff_std[t][l].update(diff)
+        # for t in range(args.timesteps):
+        #     for l in range(args.n_layers):
+        diff = neuron_pred_base.max_gate - neuron_pred_adj.max_gate
+        diff_std.update(diff)
         # save images
         out.save(os.path.join(args.modularity['img_save_path'], f'base_{iter}.jpg'))
         out_adj.save(os.path.join(args.modularity['img_save_path'], f'adj_{iter}.jpg'))

@@ -10,40 +10,20 @@ class NeuronPredictivity(BaseNeuronReceiver):
         super(NeuronPredictivity, self).__init__(seed, replace_fn, keep_nsfw)
         self.T = T
         self.n_layers = n_layers
-        self.predictivity = utils.StatMeter(T, n_layers)
+        self.predictivity = utils.Average()
         self.max_gate = {}
-        for t in range(T):
-            self.max_gate[t] = {}
-            for l in range(n_layers):
-                self.max_gate[t][l] = []
-        
-        self.timestep = 0
-        self.layer = 0
         self.replace_fn = replace_fn
-    
-    def update_time_layer(self):
-        if self.layer == self.n_layers - 1:
-            self.layer = 0
-            self.timestep += 1
-        else:
-            self.layer += 1
-
-    def reset_time_layer(self):
-        self.timestep = 0
-        self.layer = 0
-        # reset the gate 
-        for t in range(self.T):
-            self.max_gate[t] = {}
-            for l in range(self.n_layers):
-                self.max_gate[t][l] = []
     
     
     def hook_fn(self, module, input, output):
         # get hidden state
         hidden_states = module.fc1(input[0])
-        hidden_states = module.relu(hidden_states)
-        max_act = torch.mean(hidden_states.view(-1, hidden_states.shape[-1]), dim=0)
-        self.max_gate[self.timestep][self.layer] = max_act.detach().cpu().numpy()
+        hidden_states = module.activation_fn(hidden_states)
+        max_act = torch.max(hidden_states.view(-1, hidden_states.shape[-1]), dim=0)[0]
+        self.max_gate = max_act.detach().cpu().numpy()
+        self.predictivity.update(max_act.detach().cpu().numpy())
+        hidden_states = module.fc2(hidden_states)
+        return hidden_states
         # save the out
         # args = (1.0,)
         # if self.replace_fn == GEGLU:
