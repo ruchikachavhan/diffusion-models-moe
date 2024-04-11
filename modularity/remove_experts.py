@@ -107,10 +107,10 @@ def main():
     # model, _, _ = modify_ffn_to_experts(model, args)
     
     # remove experts
-    remove_experts(adj_prompts, model, neuron_receiver, args, 
-                   bounding_box=bb_coordinates_layer_adj if args.modularity['bounding_box'] else None, 
-                   save_path=args.modularity['remove_expert_path'] if not args.modularity['condition']['remove_neurons'] else args.modularity['remove_neuron_path'], 
-                     base_prompts=base_prompts)
+    # remove_experts(adj_prompts, model, neuron_receiver, args, 
+    #                bounding_box=bb_coordinates_layer_adj if args.modularity['bounding_box'] else None, 
+    #                save_path=args.modularity['remove_expert_path'] if not args.modularity['condition']['remove_neurons'] else args.modularity['remove_neuron_path'], 
+    #                  base_prompts=base_prompts)
 
     # read val_dataset
     if not os.path.exists(f'modularity/datasets/val_things_{adjectives}.txt'):
