@@ -21,7 +21,7 @@ class BaseNeuronReceiver:
             safety_checker.StableDiffusionSafetyChecker.forward = sc
         self.safety_checker = safety_checker.StableDiffusionSafetyChecker
         self.replace_fn = replace_fn
-        
+        self.remove_token_idx = None
     
     def hook_fn(self, module, input, output):
         # custom hook function
@@ -39,8 +39,7 @@ class BaseNeuronReceiver:
         # hook the model
         num_modules = 0
         for name, module in model.text_encoder.named_modules():
-            if isinstance(module, self.replace_fn) and 'mlp' in name:
-                print("Hooking: ", name)
+            if isinstance(module, self.replace_fn) and 'mlp' in name and 'encoder.layers' in name:
                 hook = module.register_forward_hook(self.hook_fn)
                 num_modules += 1
                 hooks.append(hook)
@@ -48,6 +47,19 @@ class BaseNeuronReceiver:
                     module.bounding_box = bboxes[name + '.proj.weight']
                 else:
                     module.bounding_box = None
+        print("Number of hooks: ", num_modules)
+
+        # do same for text_encoder_2
+        # for name, module in model.text_encoder_2.named_modules():
+        #     if isinstance(module, self.replace_fn) and 'mlp' in name and 'encoder.layers' in name:
+        #         # print(name)
+        #         hook = module.register_forward_hook(self.hook_fn)
+        #         num_modules += 1
+        #         hooks.append(hook)
+        #         if bboxes is not None:
+        #             module.bounding_box = bboxes[name + '.proj.weight']
+        #         else:
+        #             module.bounding_box = None
 
         # forward pass
         #  fix seed to get the same output for every run

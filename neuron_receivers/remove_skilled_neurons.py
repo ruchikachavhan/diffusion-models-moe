@@ -10,50 +10,25 @@ class RemoveNeurons(NeuronPredictivity):
     def __init__(self, seed, path_expert_indx, T, n_layers, replace_fn = GEGLU, keep_nsfw=False):
         super(RemoveNeurons, self).__init__(seed, T, n_layers, replace_fn, keep_nsfw)
         self.expert_indices = {}
-        for i in range(0, T):
-            self.expert_indices[i] = {}
-            for j in range(0, n_layers):
-                # read file 
-                print(os.path.join(path_expert_indx, f'timestep_{i}_layer_{j}.json'))
-                self.expert_indices[i][j] = json.load(open(os.path.join(path_expert_indx, f'timestep_{i}_layer_{j}.json'), 'r'))
-                print(f'timestep_{i}_layer_{j}.json', self.expert_indices[i][j])
-        self.timestep = 0
+        # for j in range(0, n_layers):
+        #     # read file 
+        #     print(os.path.join(path_expert_indx, f'layer_{j}.json'))
+        #     self.expert_indices[j] = json.load(open(os.path.join(path_expert_indx, f'layer_{j}.json'), 'r'))
+        #     print(f'layer_{j}.json', self.expert_indices[j])
         self.layer = 0
         self.gates = []
         self.replace_fn = replace_fn
 
     def hook_fn(self, module, input, output):
-        args = (1.0,)
+        hidden_states = module.fc1(input[0])
+        hidden_states = module.activation_fn(hidden_states)
 
-        # get hidden state
-        if self.replace_fn == GEGLU:
-            hidden_states, gate = module.proj(input[0], *args).chunk(2, dim=-1)
-            # apply gelu
-            gate = module.gelu(gate)
-
-            expert_indx = self.expert_indices[self.timestep][self.layer]
-            # remove those neurons from gate
-            if len(expert_indx) > 0:
-                indx = torch.where(torch.tensor(expert_indx) == 1)[0]
-                gate[:, :, indx] = -0.17
-                # gate[:, :, indx] = 0
-
-            hidden_states = hidden_states * gate
-            self.gates.append(gate.detach().cpu())
-
-        elif self.replace_fn == GELU:
-            hidden_states = module.proj(input[0])
-            hidden_states = module.gelu(hidden_states)
-            expert_indx = self.expert_indices[self.timestep][self.layer]
-            if len(expert_indx) > 0:
-                if self.timestep <= 5:
-                    indx = torch.where(torch.tensor(expert_indx) == 1)[0]
-                    hidden_states[:, :, indx] = 0
-            
-            self.gates.append(hidden_states.detach().cpu())
-
-        self.update_time_layer()
-
+        indx = torch.tensor(self.remove_token_idx).to(hidden_states.device)
+        # if self.layer < 7:
+        hidden_states[:, indx, :] = 0
+    
+        hidden_states = module.fc2(hidden_states)
+        self.update_layer()
         return hidden_states
     
     

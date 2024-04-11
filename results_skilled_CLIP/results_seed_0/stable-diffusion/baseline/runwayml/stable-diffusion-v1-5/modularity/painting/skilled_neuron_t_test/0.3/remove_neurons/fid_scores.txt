@@ -1,0 +1,2 @@
+FID score between base images and after removal images: 0.22596924006938934
+FID score between concept images and after removal images:: 0.4020935893058777

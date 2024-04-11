@@ -93,12 +93,14 @@ def get_sd_model(args):
         unet = UNet2DConditionModel.from_pretrained("latent-consistency/lcm-sdxl", torch_dtype=torch.float16, variant="fp16")
         model = DiffusionPipeline.from_pretrained("stabilityai/stable-diffusion-xl-base-1.0", unet=unet, torch_dtype=torch.float16, variant="fp16")
         model.scheduler = LCMScheduler.from_config(model.scheduler.config)
-        num_geglu = 0
-        for name, module in model.unet.named_modules():
-            if 'ff.net' in name and isinstance(module, GEGLU):
-                num_geglu += 1
+        # num_geglu = 0
+        # for name, module in model.unet.named_modules():
+        #     if 'ff.net' in name and isinstance(module, GEGLU):
+        #         num_geglu += 1
         replace_fn = CLIPMLP
-        print("Number of GEGLU layers", num_geglu)
+        # print("Number of GEGLU layers", num_geglu)
+
+        num_geglu = args.n_layers
 
     return model, num_geglu, replace_fn
 

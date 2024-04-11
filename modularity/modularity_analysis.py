@@ -63,45 +63,50 @@ def main():
     iter = 0
 
     # initialise a standard deviation mesurement for difference in predictivities for concept and base prompt
-    diff_std = utils.StandardDev()
+    diff_std = {}
+    for l in range(num_geglu):
+        diff_std[l] = utils.StandardDev()
 
     for ann, ann_adj in tqdm.tqdm(zip(base_prompts, adj_prompts)):
         if iter >= 5 and args.dbg:
             break
         print("text: ", ann, ann_adj)
         
-        # neuron_pred_base.reset_time_layer()
+        neuron_pred_base.reset_layer()
         out, _ = neuron_pred_base.observe_activation(model, ann,
                                                     bboxes=bb_coordinates_layer_base[ann] if args.modularity['bounding_box'] else None)
 
-        # neuron_pred_adj.reset_time_layer()
-        # ann_adj = ann_adj.split('\n')[0]
+        neuron_pred_adj.reset_layer()
         out_adj, _ = neuron_pred_adj.observe_activation(model, ann_adj, 
                                                     bboxes=bb_coordinates_layer_adj[ann_adj] if args.modularity['bounding_box'] else None)
 
-        # for t in range(args.timesteps):
-        #     for l in range(args.n_layers):
-        diff = neuron_pred_base.max_gate - neuron_pred_adj.max_gate
-        diff_std.update(diff)
+        for l in range(num_geglu):
+            print(neuron_pred_base.max_gate[l], neuron_pred_adj.max_gate[l])
+            diff_std[l].update(neuron_pred_base.max_gate[l] - neuron_pred_adj.max_gate[l])
+
         # save images
         out.save(os.path.join(args.modularity['img_save_path'], f'base_{iter}.jpg'))
-        out_adj.save(os.path.join(args.modularity['img_save_path'], f'adj_{iter}.jpg'))
+        # out_adj.save(os.path.join(args.modularity['img_save_path'], f'adj_{iter}.jpg'))
         iter += 1
 
-    for t in range(args.timesteps):
-        for l in range(args.n_layers):
-            diff_std[t][l] = diff_std[t][l].stddev().tolist()
-    
+
+    for l in range(num_geglu):
+        diff_std[l] = diff_std[l].stddev().tolist()  
+        neuron_pred_adj.predictivity[l] = neuron_pred_adj.predictivity[l].avg.tolist()
+        neuron_pred_base.predictivity[l] = neuron_pred_base.predictivity[l].avg.tolist()
+        print(f"Layer {l} predictivity for base: {len(neuron_pred_base.predictivity[l])}")
+        print(f"Layer {l} predictivity for adj: {len(neuron_pred_adj.predictivity[l])}")
 
     # save results
     print("Saving results")
     save_type = 'bb' if args.modularity['bounding_box'] else ''
     save_type = save_type + '_expert' if args.modularity['predictvity_for'] == 'expert' else save_type
     print(save_type)
-    print(neuron_pred_adj.predictivity)
-    neuron_pred_adj.predictivity.save(os.path.join(args.save_path, f'predictivity_adj{save_type}.json'))
-    neuron_pred_base.predictivity.save(os.path.join(args.save_path, f'predictivity_base{save_type}.json'))
-    # save diff_std
+    with open(os.path.join(args.save_path, f'predictivity_adj{save_type}.json'), 'w') as f:
+        json.dump(neuron_pred_adj.predictivity, f)
+    with open(os.path.join(args.save_path, f'predictivity_base{save_type}.json'), 'w') as f:
+        json.dump(neuron_pred_base.predictivity, f)
+    # # save diff_std
     with open(os.path.join(args.save_path, f'diff_std{save_type}.json'), 'w') as f:
         json.dump(diff_std, f)
 

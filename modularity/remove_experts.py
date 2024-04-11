@@ -4,7 +4,7 @@ import sys
 import torch
 import numpy as np
 from PIL import Image, ImageFilter
-from mod_utils import get_prompts
+from mod_utils import get_prompts, similarity_ngrams_concept
 sys.path.append(os.getcwd())
 import utils
 import eval_coco as ec
@@ -12,7 +12,8 @@ from neuron_receivers import RemoveExperts, RemoveNeurons
 sys.path.append('moefication')
 from helper import modify_ffn_to_experts
 from PIL import ImageDraw, ImageFont
- 
+from transformers import CLIPTextModel, CLIPTokenizer
+
 # if msfw is on, blur the image a 100 times
 def blur_image(image, is_nsfw):
     if is_nsfw:
@@ -20,8 +21,20 @@ def blur_image(image, is_nsfw):
             image = image.filter(ImageFilter.BLUR)
     return image
 
-def remove_experts(adj_prompts, model, neuron_receiver, args, bounding_box, save_path, base_prompts=None):
+def remove_experts(adj_prompts, model, neuron_receiver, args, bounding_box, save_path, base_prompts=None, remove_token_idx=None):
     iter = 0
+    if 'val' not in save_path:
+        neuron_receiver.remove_token_idx = remove_token_idx
+    else:
+        remove_tokens = {}
+        tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-base-patch32")
+        text_encoder = CLIPTextModel.from_pretrained("openai/clip-vit-base-patch32")
+        # clip_model, preprocess = clip.load("ViT-B/32", device=args.gpu)
+        # clip_model.eval()
+        for ann_adj in adj_prompts:
+            remove_tokens[ann_adj] = similarity_ngrams_concept(ann_adj, args.modularity['adjective'], tokenizer, text_encoder,  args)
+        
+        
     for ann_adj in adj_prompts:
         if iter >= 2 and args.dbg:
             break
@@ -31,6 +44,11 @@ def remove_experts(adj_prompts, model, neuron_receiver, args, bounding_box, save
         np.random.seed(args.seed)
         # run model for the original text
         # out = model(ann_adj).images[0]
+        if 'val' in save_path:
+            # set the remove tokens
+            neuron_receiver.remove_token_idx = [tkn+1 for tkn in remove_tokens[ann_adj]]
+            print("Removing tokens", neuron_receiver.remove_token_idx)
+
         if 'lcm' in args.model_id:
             out = model(ann_adj, num_inference_steps=4, guidance_scale=8.0).images[0]
         else:
@@ -38,9 +56,10 @@ def remove_experts(adj_prompts, model, neuron_receiver, args, bounding_box, save
 
         out.save(os.path.join('test_images', f'img_original.jpg'))
 
-        neuron_receiver.reset_time_layer()
+        neuron_receiver.reset_layer()
         # ann_adj = ann_adj + '\n'
-        out_adj, _ = neuron_receiver.observe_activation(model, ann_adj, bboxes=bounding_box[ann_adj] if bounding_box is not None else None)
+        out_adj, _ = neuron_receiver.observe_activation(model, ann_adj, 
+                            bboxes=bounding_box[ann_adj] if bounding_box is not None else None)
 
         # stitch the images to keep them side by side
         out = out.resize((256, 256))
@@ -91,7 +110,7 @@ def main():
                             T=args.timesteps, n_layers=num_geglu, replace_fn=replace_fn, keep_nsfw=args.modularity['keep_nsfw'])
                                            
     adjectives = args.modularity['adjective']
-    base_prompts, adj_prompts, _ = get_prompts(args)
+    base_prompts, adj_prompts, _, remove_token_idx = get_prompts(args)
 
     if args.modularity['bounding_box']:
         # read bounding box coordinates
@@ -107,10 +126,10 @@ def main():
     # model, _, _ = modify_ffn_to_experts(model, args)
     
     # remove experts
-    remove_experts(adj_prompts, model, neuron_receiver, args, 
-                   bounding_box=bb_coordinates_layer_adj if args.modularity['bounding_box'] else None, 
-                   save_path=args.modularity['remove_expert_path'] if not args.modularity['condition']['remove_neurons'] else args.modularity['remove_neuron_path'], 
-                     base_prompts=base_prompts)
+    # remove_experts(adj_prompts, model, neuron_receiver, args, 
+    #                bounding_box=bb_coordinates_layer_adj if args.modularity['bounding_box'] else None, 
+    #                save_path=args.modularity['remove_expert_path'] if not args.modularity['condition']['remove_neurons'] else args.modularity['remove_neuron_path'], 
+    #                  base_prompts=base_prompts, remove_token_idx=remove_token_idx)
 
     # read val_dataset
     if not os.path.exists(f'modularity/datasets/val_things_{adjectives}.txt'):
@@ -126,7 +145,7 @@ def main():
     remove_experts(val_base_prompts, model, neuron_receiver, args, 
                    bounding_box=args.modularity['bounding_box'] if args.modularity['bounding_box'] else None,
                     save_path=args.modularity['remove_expert_path_val'] if not args.modularity['condition']['remove_neurons'] else args.modularity['remove_neuron_path_val'], 
-                    base_prompts=None)
+                    base_prompts=None, remove_token_idx=remove_token_idx)
     
 
 if __name__ == "__main__":
