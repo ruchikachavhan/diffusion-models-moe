@@ -25,14 +25,14 @@ def remove_experts(adj_prompts, model, neuron_receiver, args, bounding_box, save
     iter = 0
     if 'val' not in save_path:
         neuron_receiver.remove_token_idx = remove_token_idx
-    else:
-        remove_tokens = {}
-        tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-base-patch32")
-        text_encoder = CLIPTextModel.from_pretrained("openai/clip-vit-base-patch32")
-        # clip_model, preprocess = clip.load("ViT-B/32", device=args.gpu)
-        # clip_model.eval()
-        for ann_adj in adj_prompts:
-            remove_tokens[ann_adj] = similarity_ngrams_concept(ann_adj, args.modularity['adjective'], tokenizer, text_encoder,  args)
+    # else:
+    #     remove_tokens = {}
+    #     tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-base-patch32")
+    #     text_encoder = CLIPTextModel.from_pretrained("openai/clip-vit-base-patch32")
+    #     # clip_model, preprocess = clip.load("ViT-B/32", device=args.gpu)
+    #     # clip_model.eval()
+    #     for ann_adj in adj_prompts:
+    #         remove_tokens[ann_adj] = similarity_ngrams_concept(ann_adj, args.modularity['adjective'], tokenizer, text_encoder,  args)
         
         
     for ann_adj in adj_prompts:
@@ -44,10 +44,10 @@ def remove_experts(adj_prompts, model, neuron_receiver, args, bounding_box, save
         np.random.seed(args.seed)
         # run model for the original text
         # out = model(ann_adj).images[0]
-        if 'val' in save_path:
-            # set the remove tokens
-            neuron_receiver.remove_token_idx = [tkn+1 for tkn in remove_tokens[ann_adj]]
-            print("Removing tokens", neuron_receiver.remove_token_idx)
+        # if 'val' in save_path:
+        #     # set the remove tokens
+        #     neuron_receiver.remove_token_idx = [tkn+1 for tkn in remove_tokens[ann_adj]]
+        #     print("Removing tokens", neuron_receiver.remove_token_idx)
 
         if 'lcm' in args.model_id:
             out = model(ann_adj, num_inference_steps=4, guidance_scale=8.0).images[0]
