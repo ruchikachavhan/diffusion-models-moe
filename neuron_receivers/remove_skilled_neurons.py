@@ -23,9 +23,9 @@ class RemoveNeurons(NeuronPredictivity):
         hidden_states = module.fc1(input[0])
         hidden_states = module.activation_fn(hidden_states)
 
-        # indx = torch.tensor(self.remove_token_idx).to(hidden_states.device)
+        indx = torch.tensor(self.remove_token_idx).to(hidden_states.device)
         # if self.layer < 7:
-        indx = torch.tensor([2,3,4])
+        # indx = torch.tensor([2,3,4])
         hidden_states[:, indx, :] = 0
     
         hidden_states = module.fc2(hidden_states)
