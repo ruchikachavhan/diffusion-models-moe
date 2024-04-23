@@ -4,7 +4,7 @@ import sys
 import torch
 import numpy as np
 from PIL import Image, ImageFilter
-from mod_utils import get_prompts
+from mod_utils import get_prompts, LLAVAScorer
 sys.path.append(os.getcwd())
 import utils
 import eval_coco as ec
@@ -22,6 +22,7 @@ def blur_image(image, is_nsfw):
 
 def remove_experts(adj_prompts, model, neuron_receiver, args, bounding_box, save_path, base_prompts=None):
     iter = 0
+
     for ann_adj in adj_prompts:
         if iter >= 2 and args.dbg:
             break
@@ -36,11 +37,10 @@ def remove_experts(adj_prompts, model, neuron_receiver, args, bounding_box, save
         else:
             out = model(ann_adj).images[0]
 
-        out.save(os.path.join('test_images', f'img_original.jpg'))
-
         neuron_receiver.reset_time_layer()
         # ann_adj = ann_adj + '\n'
         out_adj, _ = neuron_receiver.observe_activation(model, ann_adj, bboxes=bounding_box[ann_adj] if bounding_box is not None else None)
+
 
         # stitch the images to keep them side by side
         out = out.resize((256, 256))
@@ -60,7 +60,6 @@ def remove_experts(adj_prompts, model, neuron_receiver, args, bounding_box, save
         draw.text((80, 15), ann_adj, (255, 255, 255), font=font)
         draw.text((350, 15), 'w/o experts', (255, 255, 255), font=font)
 
-
         obj_name = base_prompts[iter].split(' ')[-1] if base_prompts is not None else ann_adj
 
         new_im.save(os.path.join(save_path, f'img_{iter}_{obj_name}.jpg'))
@@ -75,9 +74,46 @@ def remove_experts(adj_prompts, model, neuron_receiver, args, bounding_box, save
         out_adj.save(os.path.join(save_path, f'img_{iter}_adj.jpg'))
         iter += 1
 
+
 def main():
     args = utils.Config('experiments/remove_skills.yaml', 'modularity')
+    # read hyperparameters saved
+    adjective = args.modularity['adjective']
+    # hpo_method = 'noise_hpo_iterations'
+    # if hpo_method == 'noise_hpo_iterations':
+    #     hparams = json.load(open(f'modularity/hpo_results/{adjective}.json', 'r'))
+    # elif hpo_method == 'llava':
+    #     hparams = json.load(open(f'modularity/hpo_results_llava/{adjective}_hpo.json', 'r'))
+    
+    # # change ratio to value of conf_val from hparams
+    adjectives = args.modularity['adjective']
+    base_prompts, adj_prompts, _ = get_prompts(args)
+    # conf_val = hparams['conf_val']
+    all_timesteps = False
+    
+    hparams = None
+    hpo_method = None
+
+    # args.modularity['condition']['skill_ratio'] = str(args.modularity['condition']['skill_ratio']) + "/" + f'dof_{len(base_prompts) - 1}_conf_{conf_val}'
+    # if all_timesteps:
+    #     # change all timesteps to 1
+    #     for key in hparams.keys():
+    #         if 'conf' not in key:
+    #             hparams[key] = 1
+    # print(hparams)
+
     args.configure('modularity')
+    if hpo_method is not None:
+        args.modularity['remove_neuron_path'] = os.path.join(args.modularity['remove_neuron_path'], hpo_method)
+        args.modularity['remove_neuron_path_val'] = os.path.join(args.modularity['remove_neuron_path_val'], hpo_method)
+    if all_timesteps:
+        # change remove_neurons_path
+        args.modularity['remove_neuron_path'] = os.path.join(args.modularity['remove_neuron_path'], 'all_timesteps')
+        args.modularity['remove_neuron_path_val'] = os.path.join(args.modularity['remove_neuron_path_val'], 'all_timesteps')
+    if not os.path.exists(args.modularity['remove_neuron_path']):
+        os.makedirs(args.modularity['remove_neuron_path'])
+    if not os.path.exists(args.modularity['remove_neuron_path_val']):
+        os.makedirs(args.modularity['remove_neuron_path_val'])
 
     # model 
     model, num_geglu, replace_fn = utils.get_sd_model(args)
@@ -85,13 +121,20 @@ def main():
     model = model.to(args.gpu)
 
     # Neuron receiver with forward hooks
-   
+    
+
     func = RemoveNeurons if args.modularity['condition']['remove_neurons'] else RemoveExperts
     neuron_receiver =  func(seed=args.seed, path_expert_indx = args.modularity['skill_expert_path'] if not args.modularity['condition']['remove_neurons'] else args.modularity['skill_neuron_path'],
-                            T=args.timesteps, n_layers=num_geglu, replace_fn=replace_fn, keep_nsfw=args.modularity['keep_nsfw'])
+                            T=args.timesteps, n_layers=num_geglu, replace_fn=replace_fn, keep_nsfw=args.modularity['keep_nsfw'], 
+                            remove_timesteps = hparams)
                                            
-    adjectives = args.modularity['adjective']
-    base_prompts, adj_prompts, _ = get_prompts(args)
+    # adjectives = args.modularity['adjective']
+    # base_prompts, adj_prompts, _ = get_prompts(args)
+    
+    # read file
+    with open(os.path.join('modularity/datasets', args.modularity['file_name']+'.txt'), 'r') as f:
+        objects = f.readlines()
+    objects = [obj.strip() for obj in objects]
 
     if args.modularity['bounding_box']:
         # read bounding box coordinates
@@ -107,17 +150,17 @@ def main():
     # model, _, _ = modify_ffn_to_experts(model, args)
     
     # remove experts
-    # remove_experts(adj_prompts, model, neuron_receiver, args, 
-    #                bounding_box=bb_coordinates_layer_adj if args.modularity['bounding_box'] else None, 
-    #                save_path=args.modularity['remove_expert_path'] if not args.modularity['condition']['remove_neurons'] else args.modularity['remove_neuron_path'], 
-    #                  base_prompts=base_prompts)
+    remove_experts(adj_prompts, model, neuron_receiver, args, 
+                   bounding_box=bb_coordinates_layer_adj if args.modularity['bounding_box'] else None, 
+                   save_path=args.modularity['remove_expert_path'] if not args.modularity['condition']['remove_neurons'] else args.modularity['remove_neuron_path'], 
+                     base_prompts=base_prompts)
 
     # read val_dataset
-    if not os.path.exists(f'modularity/datasets/val_things_{adjectives}.txt'):
-        print(f"Validation dataset not found for {adjectives}")
+    if not os.path.exists(f'modularity/datasets/val_things_{adjective}.txt'):
+        print(f"Validation dataset not found for {adjective}")
         return
     
-    with open(f'modularity/datasets/val_things_{adjectives}.txt') as f:
+    with open(f'modularity/datasets/val_things_{adjective}.txt') as f:
         val_objects = f.readlines()
     
     val_base_prompts = [f'{thing.strip()}' for thing in val_objects]

@@ -7,7 +7,7 @@ from neuron_receivers.base_receiver import BaseNeuronReceiver
 from neuron_receivers.predictivity import NeuronPredictivity
 
 class RemoveNeurons(NeuronPredictivity):
-    def __init__(self, seed, path_expert_indx, T, n_layers, replace_fn = GEGLU, keep_nsfw=False):
+    def __init__(self, seed, path_expert_indx, T, n_layers, replace_fn = GEGLU, keep_nsfw=False, remove_timesteps=None):
         super(RemoveNeurons, self).__init__(seed, T, n_layers, replace_fn, keep_nsfw)
         self.expert_indices = {}
         for i in range(0, T):
@@ -21,6 +21,7 @@ class RemoveNeurons(NeuronPredictivity):
         self.layer = 0
         self.gates = []
         self.replace_fn = replace_fn
+        self.remove_timesteps = remove_timesteps
 
     def hook_fn(self, module, input, output):
         args = (1.0,)
@@ -34,8 +35,17 @@ class RemoveNeurons(NeuronPredictivity):
             expert_indx = self.expert_indices[self.timestep][self.layer]
             # remove those neurons from gate
             if len(expert_indx) > 0:
+                # if self.remove_timesteps is not None:
+                # #     # upfdate_1 is 1 if neurons from that timestep is removed else 0
+                #     update_t = self.remove_timesteps['timestep_'+str(self.timestep)] if self.timestep >=10 else 1
+                # else:
+                #     # remove all skilled neurons
+                #     update_t = 1
+                # if update_t == 1:
                 indx = torch.where(torch.tensor(expert_indx) == 1)[0]
                 gate[:, :, indx] = -0.17
+                # add small perturbation to the gate
+                # gate[:, :, indx] = gate[:, :, indx] + torch.rand_like(gate[:, :, indx]) * 0.1
                 # gate[:, :, indx] = 0
 
             hidden_states = hidden_states * gate
