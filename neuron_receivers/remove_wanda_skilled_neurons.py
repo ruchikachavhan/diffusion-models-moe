@@ -6,17 +6,18 @@ from diffusers.models.activations import GEGLU, GELU
 from neuron_receivers.base_receiver import BaseNeuronReceiver
 from neuron_receivers.predictivity import NeuronPredictivity
 
-class RemoveNeurons(NeuronPredictivity):
+class WandaRemoveNeurons(NeuronPredictivity):
     def __init__(self, seed, path_expert_indx, T, n_layers, replace_fn = GEGLU, keep_nsfw=False, remove_timesteps=None):
-        super(RemoveNeurons, self).__init__(seed, T, n_layers, replace_fn, keep_nsfw)
+        super(WandaRemoveNeurons, self).__init__(seed, T, n_layers, replace_fn, keep_nsfw)
         self.expert_indices = {}
         for i in range(0, T):
             self.expert_indices[i] = {}
             for j in range(0, n_layers):
-                # read file 
+                # read .pt file
                 print(os.path.join(path_expert_indx, f'timestep_{i}_layer_{j}.json'))
-                self.expert_indices[i][j] = json.load(open(os.path.join(path_expert_indx, f'timestep_{i}_layer_{j}.json'), 'r'))
-                print(f'timestep_{i}_layer_{j}.json', self.expert_indices[i][j])
+                self.expert_indices[i][j] = torch.load(os.path.join(path_expert_indx, f'timestep_{i}_layer_{j}.pt')).to(torch.float64)
+                print(f'timestep_{i}_layer_{j}.json', self.expert_indices[i][j].sum())
+                
         self.timestep = 0
         self.layer = 0
         self.gates = []
@@ -28,16 +29,22 @@ class RemoveNeurons(NeuronPredictivity):
 
         # get hidden state
         if self.replace_fn == GEGLU:
+            # Change the projection matrix, multiply the binary mask with the weights of the projection matrix
+            # last half of te projection matrix
+            # if self.timestep < 20:
+            old_weights = module.proj.weight[module.proj.weight.shape[0]//2:, :].clone()
+            # pruning
+            new_weights = old_weights * (1 - self.expert_indices[self.timestep][self.layer].to(old_weights.device))
+            module.proj.weight[module.proj.weight.shape[0]//2:, :] = new_weights
+                            
             hidden_states, gate = module.proj(input[0], *args).chunk(2, dim=-1)
+
+            # replace the weights with old weights
+            module.proj.weight[module.proj.weight.shape[0]//2:, :] = old_weights
+            
             # apply gelu
             gate = module.gelu(gate)
-
-            expert_indx = self.expert_indices[self.timestep][self.layer]
-            # remove those neurons from gate
-            if len(expert_indx) > 0:
-                indx = torch.where(torch.tensor(expert_indx) == 1)[0]
-                gate[:, :, indx] = -0.17
-
+                
             hidden_states = hidden_states * gate
             self.gates.append(gate.detach().cpu())
 

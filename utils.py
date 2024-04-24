@@ -155,7 +155,7 @@ class Config:
             else:
                 prefix = ''
             if self.modularity['concept_removal']:
-                if self.modularity['condition']['name'] == 't_test':
+                if self.modularity['condition']['name'] in ['t_test', 'wanda']:
                     self.modularity['skill_expert_path'] = os.path.join(self.save_path, prefix, f'skilled_expert_{condition}', str(ratio))
                     self.modularity['skill_neuron_path'] = os.path.join(self.save_path, prefix, f'skilled_neuron_{condition}', str(ratio))
                 elif self.modularity['condition']['name'] == 'moefy_compare':
@@ -270,3 +270,56 @@ class StatMeter:
 
         with open(path, 'w') as f:
             json.dump(self.results, f)
+
+import numpy as np
+
+class ColumnNormCalculator:
+    def __init__(self):
+        '''
+        Calculated Column Norm of a matrix incrementally as rows are added
+        Assumes 2D matrix
+        '''
+        self.A = np.zeros((0, 0))
+        self.column_norms = torch.tensor([])
+
+    def add_rows(self, rows):
+        if len(self.A) == 0:  # If it's the first row
+            self.A = rows
+            self.column_norms = torch.norm(self.A, dim=0)
+        else:
+            # self.A = np.vstack((self.A, rows))
+            new_row_norms = torch.norm(rows, dim=0)
+            self.column_norms = torch.sqrt(self.column_norms**2 + new_row_norms**2)
+
+    def get_column_norms(self):
+        return self.column_norms
+
+
+
+class TimeLayerColumnNorm:
+    '''
+    Column Norm calculator for all timesteps and layers
+    '''
+    def __init__(self, T, n_layers):
+        self.T = T
+        self.n_layers = n_layers
+        self.column_norms = {}
+        for t in range(T):
+            self.column_norms[t] = {}
+            for i in range(n_layers):
+                self.column_norms[t][i] = ColumnNormCalculator()
+
+    def update(self, rows, t, n_layer):
+        self.column_norms[t][n_layer].add_rows(rows)
+
+    def get_column_norms(self):
+        results = {}
+        for t in range(self.T):
+            results[t] = {}
+            for i in range(self.n_layers):
+                results[t][i] = self.column_norms[t][i].get_column_norms()
+        return results
+    
+    def save(self, path):
+        results = self.get_column_norms()
+        torch.save(results, path)

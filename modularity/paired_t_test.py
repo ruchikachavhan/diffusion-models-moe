@@ -83,8 +83,6 @@ def main():
                     critical_val = dof_critical_values[str(dof_val)][str(conf_val)]
                     # Negative for upper tail test
                     skilled_neurons = torch.tensor(t_value < -critical_val)
-                    # neurons that don't change are the neurons that don't pass the t-test
-                    # skilled_neurons = torch.tensor(t_value < critical_val)
                     print(f"Skilled neurons at time step {t} and layer {l} for DOF {dof_val} and confidence interval {conf_val}: {skilled_neurons.sum()} out of {len(skilled_neurons)}")
                     skilled_neurons = [int(i) for i in skilled_neurons]
                     # save in folder 

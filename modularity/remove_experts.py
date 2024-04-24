@@ -8,7 +8,7 @@ from mod_utils import get_prompts, LLAVAScorer
 sys.path.append(os.getcwd())
 import utils
 import eval_coco as ec
-from neuron_receivers import RemoveExperts, RemoveNeurons
+from neuron_receivers import RemoveExperts, RemoveNeurons, WandaRemoveNeurons
 sys.path.append('moefication')
 from helper import modify_ffn_to_experts
 from PIL import ImageDraw, ImageFont
@@ -39,7 +39,8 @@ def remove_experts(adj_prompts, model, neuron_receiver, args, bounding_box, save
 
         neuron_receiver.reset_time_layer()
         # ann_adj = ann_adj + '\n'
-        out_adj, _ = neuron_receiver.observe_activation(model, ann_adj, bboxes=bounding_box[ann_adj] if bounding_box is not None else None)
+        out_adj, _ = neuron_receiver.observe_activation(model, ann_adj,
+                                                         bboxes=bounding_box[ann_adj] if bounding_box is not None else None)
 
 
         # stitch the images to keep them side by side
@@ -60,7 +61,9 @@ def remove_experts(adj_prompts, model, neuron_receiver, args, bounding_box, save
         draw.text((80, 15), ann_adj, (255, 255, 255), font=font)
         draw.text((350, 15), 'w/o experts', (255, 255, 255), font=font)
 
-        obj_name = base_prompts[iter].split(' ')[-1] if base_prompts is not None else ann_adj
+        # obj_name = base_prompts[iter].split(' ')[-1] if base_prompts is not None else ann_adj
+        # obj_name = base_prompts[iter] if base_prompts is not None else ann_adj
+        obj_name = ann_adj
 
         new_im.save(os.path.join(save_path, f'img_{iter}_{obj_name}.jpg'))
 
@@ -122,8 +125,10 @@ def main():
 
     # Neuron receiver with forward hooks
     
-
-    func = RemoveNeurons if args.modularity['condition']['remove_neurons'] else RemoveExperts
+    if args.modularity['condition']['name'] == 't_test':
+        func = RemoveNeurons if args.modularity['condition']['remove_neurons'] else RemoveExperts
+    elif args.modularity['condition']['name'] == 'wanda':
+        func = WandaRemoveNeurons
     neuron_receiver =  func(seed=args.seed, path_expert_indx = args.modularity['skill_expert_path'] if not args.modularity['condition']['remove_neurons'] else args.modularity['skill_neuron_path'],
                             T=args.timesteps, n_layers=num_geglu, replace_fn=replace_fn, keep_nsfw=args.modularity['keep_nsfw'], 
                             remove_timesteps = hparams)

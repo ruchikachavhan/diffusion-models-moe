@@ -47,7 +47,7 @@ def get_prompts(args):
             adj_prompts = [f'a {thing} in the style of {adjectives[0]}' for thing in things]
 
         elif adjectives[0] in ['gender']:
-            base_prompts = [f'a photo of a female {thing}' for thing in things]
+            base_prompts = [f'a photo of a {thing}' for thing in things]
             adj_prompts = [f'a photo of a {thing}' for thing in things]
 
         elif adjectives[0] in ['scene_removal_cat']:

@@ -5,6 +5,7 @@ results_seed_3/*
 results_seed_4/*
 results_seed_5/*
 results_all_seeds/*
+results_skilled_CLIP/*
 backup_results/*
 compare_models_results/*
 *.png

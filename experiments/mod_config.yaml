@@ -3,10 +3,10 @@ modularity:
   adjective: 'memorize'
   file_name: 'memorize'
   keep_nsfw: false
-  concept_removal: false
+  concept_removal: true
   predictvity_for: 'neuron'
   condition:
-    name: 't_test'
+    name: 'wanda'
     skill_ratio: 0.3
     remove_neurons: false
   bounding_box: false

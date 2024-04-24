@@ -9,8 +9,8 @@ modularity:
   keep_nsfw: false
   concept_removal: true
   condition:
-    name: 't_test'
-    skill_ratio: '0.3/dof_9_conf_0.001'
+    name: 'wanda'
+    skill_ratio: 0.3
     remove_neurons: true
   bounding_box: false
   single_sample_test: false
