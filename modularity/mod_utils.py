@@ -61,6 +61,11 @@ def get_prompts(args):
             base_prompts = [f'a {thing}' for thing in things]
             adj_prompts = [f'a {thing} with a cat' for thing in things]
             remove_token_idx = [3, 4, 5]
+        
+        elif adjectives[0] in ['memorize']:
+            base_prompts = ['' for _ in things]
+            adj_prompts = [thing for thing in things]
+            remove_token_idx = [3, 4, 5]
 
     elif len(adjectives) == 2:
         # consider the first adjective as base prompt

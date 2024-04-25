@@ -7,6 +7,7 @@ results_seed_5/*
 results_all_seeds/*
 backup_results/*
 compare_models_results/*
+results_skilled_CLIP/*
 *.png
 __pycache__/
 *.jpg

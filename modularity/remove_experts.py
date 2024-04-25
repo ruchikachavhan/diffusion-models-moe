@@ -8,7 +8,7 @@ from mod_utils import get_prompts, similarity_ngrams_concept
 sys.path.append(os.getcwd())
 import utils
 import eval_coco as ec
-from neuron_receivers import RemoveExperts, RemoveNeurons
+from neuron_receivers import RemoveExperts, RemoveNeurons, WandaRemoveNeurons
 sys.path.append('moefication')
 from helper import modify_ffn_to_experts
 from PIL import ImageDraw, ImageFont
@@ -104,8 +104,10 @@ def main():
     model = model.to(args.gpu)
 
     # Neuron receiver with forward hooks
-   
-    func = RemoveNeurons if args.modularity['condition']['remove_neurons'] else RemoveExperts
+    if args.modularity['condition']['name'] == 't_test':
+        func = RemoveNeurons if args.modularity['condition']['remove_neurons'] else RemoveExperts
+    elif args.modularity['condition']['name'] == 'wanda':
+        func = WandaRemoveNeurons
     neuron_receiver =  func(seed=args.seed, path_expert_indx = args.modularity['skill_expert_path'] if not args.modularity['condition']['remove_neurons'] else args.modularity['skill_neuron_path'],
                             T=args.timesteps, n_layers=num_geglu, replace_fn=replace_fn, keep_nsfw=args.modularity['keep_nsfw'])
                                            
@@ -126,10 +128,10 @@ def main():
     # model, _, _ = modify_ffn_to_experts(model, args)
     
     # remove experts
-    # remove_experts(adj_prompts, model, neuron_receiver, args, 
-    #                bounding_box=bb_coordinates_layer_adj if args.modularity['bounding_box'] else None, 
-    #                save_path=args.modularity['remove_expert_path'] if not args.modularity['condition']['remove_neurons'] else args.modularity['remove_neuron_path'], 
-    #                  base_prompts=base_prompts, remove_token_idx=remove_token_idx)
+    remove_experts(adj_prompts, model, neuron_receiver, args, 
+                   bounding_box=bb_coordinates_layer_adj if args.modularity['bounding_box'] else None, 
+                   save_path=args.modularity['remove_expert_path'] if not args.modularity['condition']['remove_neurons'] else args.modularity['remove_neuron_path'], 
+                     base_prompts=base_prompts, remove_token_idx=remove_token_idx)
 
     # read val_dataset
     if not os.path.exists(f'modularity/datasets/val_things_{adjectives}.txt'):

@@ -4,12 +4,12 @@ moefication:
   templates: '%s.%s.attentions.%s.transformer_blocks.0.ff.net.0.proj.weight'
   topk_experts: 0.2
 modularity:
-  adjective: 'scene_removal_cat'
-  file_name: 'scenes'
-  keep_nsfw: false
+  adjective: 'naked'
+  file_name: 'humans'
+  keep_nsfw: true
   concept_removal: true
   condition:
-    name: 't_test'
+    name: 'wanda'
     skill_ratio: 0.3
     remove_neurons: true
   bounding_box: false

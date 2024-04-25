@@ -157,7 +157,7 @@ class Config:
             else:
                 prefix = ''
             if self.modularity['concept_removal']:
-                if self.modularity['condition']['name'] == 't_test':
+                if self.modularity['condition']['name'] in ['t_test', 'wanda']:
                     self.modularity['skill_expert_path'] = os.path.join(self.save_path, prefix, f'skilled_expert_{condition}', str(ratio))
                     self.modularity['skill_neuron_path'] = os.path.join(self.save_path, prefix, f'skilled_neuron_{condition}', str(ratio))
                 elif self.modularity['condition']['name'] == 'moefy_compare':
@@ -272,3 +272,24 @@ class StatMeter:
 
         with open(path, 'w') as f:
             json.dump(self.results, f)
+
+class ColumnNormCalculator:
+    def __init__(self):
+        '''
+        Calculated Column Norm of a matrix incrementally as rows are added
+        Assumes 2D matrix
+        '''
+        self.A = np.zeros((0, 0))
+        self.column_norms = torch.tensor([])
+
+    def add_rows(self, rows):
+        if len(self.A) == 0:  # If it's the first row
+            self.A = rows
+            self.column_norms = torch.norm(self.A, dim=0)
+        else:
+            # self.A = np.vstack((self.A, rows))
+            new_row_norms = torch.norm(rows, dim=0)
+            self.column_norms = torch.sqrt(self.column_norms**2 + new_row_norms**2)
+
+    def get_column_norms(self):
+        return self.column_norms
