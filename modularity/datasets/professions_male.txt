@@ -8,3 +8,13 @@ manager
 librarian
 salesperson
 attendant
+banker
+biologist
+book editor
+cardiologist
+carpenter
+chef
+chemical engineer
+cinematographer
+civil Engineer
+electrician

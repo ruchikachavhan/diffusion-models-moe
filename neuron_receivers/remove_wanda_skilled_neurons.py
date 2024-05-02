@@ -5,18 +5,29 @@ import numpy as np
 from diffusers.models.activations import GEGLU, GELU
 from neuron_receivers.base_receiver import BaseNeuronReceiver
 from neuron_receivers.predictivity import NeuronPredictivity
+from diffusers.models.activations import LoRACompatibleLinear
 
 class WandaRemoveNeurons(NeuronPredictivity):
-    def __init__(self, seed, path_expert_indx, T, n_layers, replace_fn = GEGLU, keep_nsfw=False, remove_timesteps=None):
+    def __init__(self, seed, path_expert_indx, T, n_layers, replace_fn = GEGLU, keep_nsfw=False, remove_timesteps=None, weights_shape=None):
         super(WandaRemoveNeurons, self).__init__(seed, T, n_layers, replace_fn, keep_nsfw)
         self.expert_indices = {}
         for i in range(0, T):
             self.expert_indices[i] = {}
             for j in range(0, n_layers):
                 # read .pt file
-                print(os.path.join(path_expert_indx, f'timestep_{i}_layer_{j}.json'))
-                self.expert_indices[i][j] = torch.load(os.path.join(path_expert_indx, f'timestep_{i}_layer_{j}.pt')).to(torch.float64)
-                print(f'timestep_{i}_layer_{j}.json', self.expert_indices[i][j].sum())
+                # print(os.path.join(path_expert_indx, f'timestep_{i}_layer_{j}.json'))
+                # load indices from json file
+                with open(os.path.join(path_expert_indx, f'timestep_{i}_layer_{j}.json'), 'r') as f:
+                    indices =json.load(f)
+                    indices = torch.tensor(indices)
+                # create a binary mask of the shape of weights
+                binary_mask = torch.zeros(weights_shape[j])
+                # indices is of shape (n, 2) where n is the number of skilled neurons
+                # set the binary mask to 1 at the indices
+                # dont use scatter_ due to error in pytorch
+                binary_mask[indices[:, 0], indices[:, 1]] = 1
+                self.expert_indices[i][j] = binary_mask.half()
+                print("Expert indices: ", self.expert_indices[i][j].mean(), self.expert_indices[i][j].shape)
                 
         self.timestep = 0
         self.layer = 0
@@ -31,7 +42,6 @@ class WandaRemoveNeurons(NeuronPredictivity):
         if self.replace_fn == GEGLU:
             # Change the projection matrix, multiply the binary mask with the weights of the projection matrix
             # last half of te projection matrix
-            # if self.timestep < 20:
             old_weights = module.proj.weight[module.proj.weight.shape[0]//2:, :].clone()
             # pruning
             new_weights = old_weights * (1 - self.expert_indices[self.timestep][self.layer].to(old_weights.device))
@@ -63,7 +73,46 @@ class WandaRemoveNeurons(NeuronPredictivity):
 
         return hidden_states
     
-    
+    def linear_hook_fn(self, module, input, output):
+        # Linear (lora compatible layer)
+        # change wieghts by applying the binary mask
+        old_weights = module.weight.clone()
+        new_weights = old_weights * (1 - self.expert_indices[self.timestep][self.layer].to(old_weights.device))
+
+        # Apply the forward pass with matrix multiplication
+        output_dim, input_dim = new_weights.shape
+        proj = torch.nn.Linear(output_dim, input_dim)
+        # copy the weights into proj
+        proj.weight = torch.nn.Parameter(new_weights)
+        proj.bias = torch.nn.Parameter(module.bias)
+        hidden_states = proj(input[0])
+        
+        # replace the weights with old weights
+        self.update_time_layer()
+        return hidden_states
+
+
+    def observe_activation(self, model, ann, bboxes=None):
+        # hook the model
+        hooks = []
+        num_modules = 0
+        for name, module in model.unet.named_modules():
+            if isinstance(module, LoRACompatibleLinear) and 'ff.net' in name and not 'proj' in name:
+                print("Hooking: ", name)
+                hook = module.register_forward_hook(self.linear_hook_fn)
+                num_modules += 1
+                hooks.append(hook)
+
+        # forward pass
+        #  fix seed to get the same output for every run
+        torch.manual_seed(self.seed)
+        np.random.seed(self.seed)
+        out = model(ann).images[0]
+
+        # remove the hook
+        self.remove_hooks(hooks)
+        return out, self.gates
+
     def test(self, model, ann = 'an white cat', relu_condition = False):
         # hook the model
         torch.manual_seed(self.seed)

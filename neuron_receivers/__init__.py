@@ -15,3 +15,5 @@ from neuron_receivers.remove_skilled_neurons_noise_hpo import RemoveNeuronsNoise
 from neuron_receivers.base_unet_receiver import BaseUNetReceiver
 from neuron_receivers.wanda_receiver import Wanda
 from neuron_receivers.remove_wanda_skilled_neurons import WandaRemoveNeurons
+from neuron_receivers.remove_wanda_neurons_fast import WandaRemoveNeuronsFast
+from neuron_receivers.multi_concept_remover import MultiConceptRemoverWanda

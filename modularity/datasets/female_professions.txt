@@ -1,0 +1,53 @@
+Anthropologist
+Art Critic
+Art Therapist
+Astronomer
+Athlete
+Botanist
+Business Analyst
+Chemist
+Choreographer
+Copywriter
+Costume Designer
+Customer Service Representative
+Dance Instructor
+Dermatologist
+Environmental Scientist
+Event Planner
+Fashion Designer
+Fashion Stylist
+Fine Artist
+Fitness Trainer
+Flight Attendant
+Graphic Artist
+Hairdresser
+Interior Designer
+Lawyer
+Librarian
+Logistics Manager
+Makeup Artist
+News Anchor
+Nurse
+Occupational Therapist
+Operations Research Analyst
+Optometrist
+Pharmacist
+Physical Therapist
+Playwright
+Real Estate Agent
+Research Analyst
+Social Worker
+Sociologist
+Software Engineer
+Speech Therapist
+Talent Agent
+Teacher
+Teacher Assistant
+Textile Designer
+Translator
+Travel Writer
+Voice Actor
+Wardrobe Stylist
+Wedding Planner
+Wildlife Biologist
+Writer

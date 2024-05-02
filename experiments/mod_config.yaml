@@ -1,13 +1,13 @@
 moefication: null
 modularity:
-  adjective: 'memorize'
-  file_name: 'memorize'
+  adjective: 'gender_female'
+  file_name: 'professions_male'
   keep_nsfw: false
   concept_removal: true
   predictvity_for: 'neuron'
   condition:
     name: 'wanda'
-    skill_ratio: 0.3
+    skill_ratio: 0.003
     remove_neurons: false
   bounding_box: false
   single_sample_test: false
@@ -27,6 +27,7 @@ inference:
 # dbg: false
 res_path: 'results/stable-diffusion'
 model_id: 'runwayml/stable-diffusion-v1-5'
+# model_id: 'CompVis/stable-diffusion-v1-4'
 n_layers: 16
 fine_tuned_unet: null
 # fine_tuned_unet: '../diffusers/examples/text_to_image/relufied-stable-diffusion-v1-5/checkpoint-14000/'

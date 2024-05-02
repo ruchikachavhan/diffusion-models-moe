@@ -15,7 +15,6 @@ from transformers import CLIPProcessor, CLIPModel, AutoTokenizer, AutoProcessor
 sys.path.append(os.getcwd())
 from utils import get_sd_model, coco_dataset, Config
 
-
 class CLIPModelWrapper(torch.nn.Module):
     def __init__(self, device):
         super(CLIPModelWrapper, self).__init__()

@@ -7,7 +7,7 @@ from neuron_receivers.base_receiver import BaseNeuronReceiver
 from neuron_receivers.predictivity import NeuronPredictivity
 
 class RemoveNeurons(NeuronPredictivity):
-    def __init__(self, seed, path_expert_indx, T, n_layers, replace_fn = GEGLU, keep_nsfw=False, remove_timesteps=None):
+    def __init__(self, seed, path_expert_indx, T, n_layers, replace_fn = GEGLU, keep_nsfw=False, remove_timesteps=None, weights_shape=None):
         super(RemoveNeurons, self).__init__(seed, T, n_layers, replace_fn, keep_nsfw)
         self.expert_indices = {}
         for i in range(0, T):

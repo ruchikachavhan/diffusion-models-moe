@@ -9,9 +9,10 @@ from diffusers import StableDiffusionPipeline, UNet2DConditionModel
 from diffusers import PixArtAlphaPipeline
 sys.path.append('sparsity')
 from diffusers.models.activations import GEGLU, GELU
-from diffusers import UNet2DConditionModel, DiffusionPipeline, LCMScheduler
+from diffusers import UNet2DConditionModel, DiffusionPipeline, LCMScheduler, EulerDiscreteScheduler, DPMSolverMultistepScheduler
 from relufy_model import find_and_change_geglu
 from transformers.models.clip.modeling_clip import CLIPMLP
+from sld import SLDPipeline
 
 def make_dirs(args):
     if not os.path.exists('test_images'):
@@ -77,6 +78,35 @@ def get_sd_model(args):
         num_geglu = args.n_layers
 
         replace_fn = GEGLU
+    elif args.model_id == 'CompVis/stable-diffusion-v1-4':
+        model = StableDiffusionPipeline.from_pretrained(args.model_id, torch_dtype=torch.float16)
+        num_geglu = args.n_layers
+        replace_fn = GEGLU
+
+    elif args.model_id == 'CompVis/stable-diffusion-v1-4-safe':
+        model = SLDPipeline.from_pretrained("CompVis/stable-diffusion-v1-4")
+        num_geglu = args.n_layers
+        replace_fn = GEGLU
+
+    elif args.model_id == "stabilityai/stable-diffusion-2":
+        scheduler = EulerDiscreteScheduler.from_pretrained(args.model_id, subfolder="scheduler")
+        model = StableDiffusionPipeline.from_pretrained(args.model_id, scheduler=scheduler, torch_dtype=torch.float16)
+        num_geglu = args.n_layers
+        replace_fn = GEGLU
+    
+    elif args.model_id == "stabilityai/stable-diffusion-2-1":
+        model = StableDiffusionPipeline.from_pretrained(args.model_id, torch_dtype=torch.float16)
+        model.scheduler = DPMSolverMultistepScheduler.from_config(model.scheduler.config)
+        num_geglu = args.n_layers
+        replace_fn = GEGLU
+    elif args.model_id == 'UCE-baseline':
+        unet_path = "../unified-concept-editing/models/erased-violence_nudity_harm-towards_uncond-preserve_false-sd_1_4-method_replace.pt"
+        unet = UNet2DConditionModel.from_pretrained('CompVis/stable-diffusion-v1-4', subfolder="unet", torch_dtype=torch.float16)
+        unet.load_state_dict(torch.load(unet_path))
+        model = StableDiffusionPipeline.from_pretrained('CompVis/stable-diffusion-v1-4', unet=unet, torch_dtype=torch.float16)
+        num_geglu = args.n_layers
+        replace_fn = GEGLU
+                                    
 
     elif 'xl-base-1.0' in args.model_id:
         model = AutoPipelineForText2Image.from_pretrained(args.model_id, torch_dtype=torch.float32)

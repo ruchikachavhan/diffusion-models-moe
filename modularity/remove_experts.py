@@ -8,7 +8,8 @@ from mod_utils import get_prompts, LLAVAScorer
 sys.path.append(os.getcwd())
 import utils
 import eval_coco as ec
-from neuron_receivers import RemoveExperts, RemoveNeurons, WandaRemoveNeurons
+from diffusers.models.activations import LoRACompatibleLinear
+from neuron_receivers import RemoveExperts, RemoveNeurons, WandaRemoveNeurons, WandaRemoveNeuronsFast
 sys.path.append('moefication')
 from helper import modify_ffn_to_experts
 from PIL import ImageDraw, ImageFont
@@ -57,9 +58,9 @@ def remove_experts(adj_prompts, model, neuron_receiver, args, bounding_box, save
 
         # write the prompt on the image
         draw = ImageDraw.Draw(new_im)
-        font = ImageFont.load_default(size=15)
-        draw.text((80, 15), ann_adj, (255, 255, 255), font=font)
-        draw.text((350, 15), 'w/o experts', (255, 255, 255), font=font)
+        # font = ImageFont.load_default(size=15)
+        draw.text((80, 15), ann_adj, (255, 255, 255))
+        draw.text((350, 15), 'w/o experts', (255, 255, 255))
 
         # obj_name = base_prompts[iter].split(' ')[-1] if base_prompts is not None else ann_adj
         # obj_name = base_prompts[iter] if base_prompts is not None else ann_adj
@@ -123,15 +124,24 @@ def main():
     args.replace_fn = replace_fn
     model = model.to(args.gpu)
 
+    weights_shape = {}
+    for name, module in model.unet.named_modules():
+        if isinstance(module, LoRACompatibleLinear) and 'ff.net' in name and not 'proj' in name:
+            weights_shape[name] = module.weight.shape
+    # sort keys
+    weights_shape = dict(sorted(weights_shape.items()))
+    weights_shape = [weights_shape[key] for key in weights_shape.keys()]
+    print("Weights shape: ", weights_shape)
+
     # Neuron receiver with forward hooks
     
     if args.modularity['condition']['name'] == 't_test':
         func = RemoveNeurons if args.modularity['condition']['remove_neurons'] else RemoveExperts
     elif args.modularity['condition']['name'] == 'wanda':
-        func = WandaRemoveNeurons
+        func = WandaRemoveNeuronsFast
     neuron_receiver =  func(seed=args.seed, path_expert_indx = args.modularity['skill_expert_path'] if not args.modularity['condition']['remove_neurons'] else args.modularity['skill_neuron_path'],
                             T=args.timesteps, n_layers=num_geglu, replace_fn=replace_fn, keep_nsfw=args.modularity['keep_nsfw'], 
-                            remove_timesteps = hparams)
+                            remove_timesteps = hparams, weights_shape = weights_shape)
                                            
     # adjectives = args.modularity['adjective']
     # base_prompts, adj_prompts, _ = get_prompts(args)
@@ -176,6 +186,7 @@ def main():
                     save_path=args.modularity['remove_expert_path_val'] if not args.modularity['condition']['remove_neurons'] else args.modularity['remove_neuron_path_val'], 
                     base_prompts=None)
     
+
 
 if __name__ == "__main__":
     main()

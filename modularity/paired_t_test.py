@@ -42,6 +42,7 @@ def main():
 
     dof, conf_int, dof_critical_values = critical_value_ranges()
     print(dof_critical_values) 
+    
 
     # param_split = os.listdir(os.path.join(args.res_path, 'param_split'))
 
@@ -53,6 +54,7 @@ def main():
     # read things.txt
 
     base_prompts, _, _ = get_prompts(args)
+    dof = [len(base_prompts) - 1]
 
     # read predicitivity files 
     predictivity_data = {}
@@ -81,17 +83,76 @@ def main():
             for dof_val in dof:
                 for conf_val in conf_int:
                     critical_val = dof_critical_values[str(dof_val)][str(conf_val)]
-                    # Negative for upper tail test
-                    skilled_neurons = torch.tensor(t_value < -critical_val)
-                    print(f"Skilled neurons at time step {t} and layer {l} for DOF {dof_val} and confidence interval {conf_val}: {skilled_neurons.sum()} out of {len(skilled_neurons)}")
-                    skilled_neurons = [int(i) for i in skilled_neurons]
-                    # save in folder 
-                    # make a folder for every dof and confidence interval
                     folder_name = f"dof_{dof_val}_conf_{conf_val}"
-                    if not os.path.exists(os.path.join(args.modularity['skill_neuron_path'], folder_name)):
-                        os.makedirs(os.path.join(args.modularity['skill_neuron_path'], folder_name))
-                    with open(os.path.join(args.modularity['skill_neuron_path'], folder_name, f'timestep_{t}_layer_{l}.json'), 'w') as f:
-                        json.dump(skilled_neurons, f)
+
+                    # ------------------------------------------------------------ Negative for upper tail test ---------------------------------------------------------
+                    # skilled_neurons = torch.tensor(t_value < -critical_val)
+                    # print(f"Skilled neurons at time step {t} and layer {l} for DOF {dof_val} and confidence interval {conf_val}: {skilled_neurons.sum()} out of {len(skilled_neurons)}")
+                    # skilled_neurons = [int(i) for i in skilled_neurons]
+                    # # save in folder 
+                    # # make a folder for every dof and confidence interval
+                    
+                    # if not os.path.exists(os.path.join(args.modularity['skill_neuron_path'], folder_name)):
+                    #     os.makedirs(os.path.join(args.modularity['skill_neuron_path'], folder_name))
+                    # with open(os.path.join(args.modularity['skill_neuron_path'], folder_name, f'timestep_{t}_layer_{l}.json'), 'w') as f:
+                    #     json.dump(skilled_neurons, f)
+
+                    # -------------------------------------------- rank the neurons based on t-value. More negative t-value, more skilled the neuron ----------------------------------------
+                    
+                    # indices of neurons that pass the t-test
+                    # skilled_indices = np.where(t_value < -critical_val)[0]
+                    # # sort the t-value of skilled indieces
+                    # sorted_indices = np.argsort(t_value[skilled_indices])
+                    # # save in folder
+                    # if not os.path.exists(os.path.join(args.modularity['skill_neuron_path'], folder_name, 'top-k')):
+                    #     os.makedirs(os.path.join(args.modularity['skill_neuron_path'], folder_name, 'top-k'))
+
+                    # # select top 10% of skilled neurons
+                    # top_k_skilled = sorted_indices[:int(0.7 * len(sorted_indices))]
+                    # # make a binary mask of skilled neurons
+                    # skilled_neurons = torch.zeros(len(t_value))
+
+                    # # out of the 
+                    # skilled_neurons[top_k_skilled] = 1
+                    # skilled_neurons = skilled_neurons.tolist()
+                    # print(f"Top k skilled neurons at time step {t} and layer {l} for DOF {dof_val} and confidence interval {conf_val}: {np.mean(skilled_neurons)} out of {len(skilled_neurons)}")
+                    # with open(os.path.join(args.modularity['skill_neuron_path'], folder_name, 'top-k', f'timestep_{t}_layer_{l}.json'), 'w') as f:
+                    #     json.dump(skilled_neurons, f)
+
+                    # ----------------------------------------------------- select random neurons from the unskilled neurons -------------------------------------------
+                    sorted_t_value = np.sort(t_value)
+                    # select unskilled neurons
+                    ratio = 0.8
+                    unskilled_indices = np.where(sorted_t_value >= -critical_val)[0]
+                    # select top 10% of unskilled neurons
+                    sorted_indices = unskilled_indices[:int(ratio * len(unskilled_indices))]
+                    
+                    # make a binary mask of random neurons
+                    random_neurons = torch.zeros(len(t_value))
+                    random_neurons[sorted_indices] = 1
+                    random_neurons = random_neurons.tolist()
+                    if not os.path.exists(os.path.join(args.modularity['skill_neuron_path'], folder_name, f'random_unskilled_{ratio}')):
+                        os.makedirs(os.path.join(args.modularity['skill_neuron_path'], folder_name, f'random_unskilled_{ratio}'))
+                    print(f"Random neurons at time step {t} and layer {l} for DOF {dof_val} and confidence interval {conf_val}: {np.mean(random_neurons)} out of {len(random_neurons)}")
+                    with open(os.path.join(args.modularity['skill_neuron_path'], folder_name, f'random_unskilled_{ratio}', f'timestep_{t}_layer_{l}.json'), 'w') as f:
+                        json.dump(random_neurons, f)
+                    
+                    # ----------------------------------------------------- select random neurons from the skilled neurons -------------------------------------------
+                        
+                    skilled_indices = np.where(t_value < -critical_val)[0]
+                    # select random neurons from the skilled neurons
+                    ratio = 0.1
+                    random_indices = np.random.choice(skilled_indices, int(ratio * len(skilled_indices)), replace=False)
+                    # make a binary mask of random neurons
+                    random_neurons = torch.zeros(len(t_value))
+                    random_neurons[random_indices] = 1
+                    random_neurons = random_neurons.tolist()
+                    if not os.path.exists(os.path.join(args.modularity['skill_neuron_path'], folder_name, f'random_skilled_{ratio}')):
+                        os.makedirs(os.path.join(args.modularity['skill_neuron_path'], folder_name, f'random_skilled_{ratio}'))
+                    print(f"Random neurons at time step {t} and layer {l} for DOF {dof_val} and confidence interval {conf_val}: {np.mean(random_neurons)} out of {len(random_neurons)}")
+                    with open(os.path.join(args.modularity['skill_neuron_path'], folder_name, f'random_skilled_{ratio}', f'timestep_{t}_layer_{l}.json'), 'w') as f:
+                        json.dump(random_neurons, f)
+
 
                 # one sided upper tail t-test with alpha = 0.05
                 # If neuron passes the t-test, it is considered skilled

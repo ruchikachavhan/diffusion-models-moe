@@ -4,13 +4,13 @@ moefication:
   templates: '%s.%s.attentions.%s.transformer_blocks.0.ff.net.0.proj.weight'
   topk_experts: 0.2
 modularity:
-  adjective: 'memorize'
-  file_name: 'memorize'
+  adjective: 'gender_female'
+  file_name: 'female_professions'
   keep_nsfw: false
   concept_removal: true
   condition:
     name: 'wanda'
-    skill_ratio: 0.3
+    skill_ratio: 0.003
     remove_neurons: true
   bounding_box: false
   single_sample_test: false
@@ -39,10 +39,15 @@ inference:
 # dbg: false
 res_path: 'results/stable-diffusion'
 model_id: 'runwayml/stable-diffusion-v1-5'
+# model_id: 'CompVis/stable-diffusion-v1-4'
+# model_id : 'UCE-baseline'
+# model_id: 'CompVis/stable-diffusion-v1-4-safe'
+# model_id: "stabilityai/stable-diffusion-2"
+# model_id: "AIML-TUDA/stable-diffusion-safe"
 n_layers: 16
 fine_tuned_unet: null
 # fine_tuned_unet: '../diffusers/examples/text_to_image/relufied-stable-diffusion-v1-5/checkpoint-14000/'
-gpu: 5
+gpu: 7
 seed: 0
 default_eval_seed: 42
 timesteps: 51

@@ -35,9 +35,16 @@ class Wanda(BaseNeuronReceiver):
             ''' 
             Store the norm of the gate for each layer and timestep in the predictivity object 
             '''
-            save_gate = input[0].view(-1, input[0].shape[-1]).detach().cpu()
+            # save_gate = input[0].view(-1, input[0].shape[-1]).detach().cpu()
+            # save_gate = torch.nn.functional.normalize(save_gate, p=2, dim=1)
+
+            out = hidden_states * module.gelu(gate)
+            save_gate = out.view(-1, out.shape[-1]).detach().cpu()
+            # # take max over the sequence length
+            # save_gate = torch.max(save_gate, dim=0)[0]
             save_gate = torch.nn.functional.normalize(save_gate, p=2, dim=1)
             self.predictivity.update(save_gate, self.timestep, self.layer)
+
             self.update_time_layer()
 
             return hidden_states * module.gelu(gate)

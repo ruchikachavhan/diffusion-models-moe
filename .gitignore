@@ -21,3 +21,9 @@ modularity/__pycache__
 bounding_boxes/__pycache__
 neuron_receivers/__pycache__
 *.ttf
+modularity/datasets/*.parquet
+modularity/datasets/*.csv
+modularity/datasets/*.zip
+modularity/datasets/*.tar.gz
+modularity/datasets/*.pt
+'benchmarking results'

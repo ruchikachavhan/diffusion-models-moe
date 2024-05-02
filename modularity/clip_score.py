@@ -10,108 +10,136 @@ from mod_utils import get_prompts
 sys.path.append(os.getcwd())
 import utils
 sys.path.append('sparsity')
-from eval_coco import CLIPModelWrapper
-from torchmetrics.image.lpip import LearnedPerceptualImagePatchSimilarity
 from torchvision import transforms
+from torchmetrics.multimodal import CLIPImageQualityAssessment as CLIPIQA
+
+
+def design_test_prompt(adjective):
+    # Return tuple of propmts 
+    if adjective in ["naked"]:
+        return ("not naked", "naked"), 17
+    elif adjective in ["Van Gogh", "Monet", "Pablo Picasso", "manga"]:
+        return ("photo", "a painting in the style of Van Gogh"), 19
+    elif adjective in ["gender"]:
+        return ("photo of a woman", "photo of a man"), 9
+    elif adjective in ['bloody red']:
+        return ("peaceful photo", "scary photo"), 14
+    elif adjective in ['scene_removal_cat']:
+        return ("a scene", "photo of a cat"), 11
+
+def intialise_results_dict():
+    avg_scores = {}
+    avg_scores['base'] = {}
+    avg_scores['concept'] = {}
+    avg_scores['concept_removal'] = {}
+    avg_scores['base']['quality'] = {}
+    avg_scores['base']['concept_sim'] = {}
+    avg_scores['concept']['quality'] = {}
+    avg_scores['concept']['concept_sim'] = {}
+    avg_scores['concept_removal']['quality'] = {}
+    avg_scores['concept_removal']['concept_sim'] = {}
+    return avg_scores
+
+def average_val_dict(scores_dict):
+    # return the average value of the dictionary
+    avg_scores = 0.0
+    for key in scores_dict.keys():
+        avg_scores += scores_dict[key]
+    return avg_scores/len(scores_dict.keys())
+
 
 def main():
     args = utils.Config('experiments/remove_skills.yaml', 'modularity')
-    args.configure('modularity')
+    if args.modularity['condition']['name'] == 't_test':
+        conf_intervals = [0.001, 0.01, 0.02, 0.05, 0.1, 0.2]
+        # conf_intervals = [0.001]
+    elif args.modularity['condition']['name'] == 'wanda':
+        # conf_intervals = [0.01, 0.02, 0.03, 0.05, 0.08, 0.1]
+        conf_intervals = [0.01, 0.02]
+    # Reconfigure 
     adjective = args.modularity['adjective']
 
     base_prompts, adj_prompts, _ = get_prompts(args)
     print(base_prompts)
+    test_prompts, dof = design_test_prompt(adjective)
+    # for evry confidence interval value, re generate arguments and run th whole loop again
+    skill_ratio = args.modularity['condition']['skill_ratio']
+    for conf_int in conf_intervals:
+        print("Confidence Interval: ", conf_int)
+        if args.modularity['condition']['name'] == 't_test':
+            args.modularity['condition']['skill_ratio'] = str(skill_ratio) + "/" + f"dof_{dof}_conf_{conf_int}" 
+        elif args.modularity['condition']['name'] == 'wanda':
+            args.modularity['condition']['skill_ratio'] =  str(conf_int)
+        args.configure('modularity')
 
-    # Load the CLIP model
-    model, preprocess = clip.load("ViT-B/32", device=args.gpu)
-    model.eval()
+        base_root = args.modularity['img_save_path']
+        base_prefix = 'base_{}'
+        adj_prefix = 'adj_{}'
+        # images after removal
+        results_root = args.modularity['remove_expert_path'] if not args.modularity['condition']['remove_neurons'] else args.modularity['remove_neuron_path']
+        after_removal_prefix = 'img_{}_adj'
 
-    base_root = args.modularity['img_save_path']
-    base_prefix = 'base_{}'
-    # images after removal
-    adj_root = args.modularity['remove_expert_path'] if not args.modularity['condition']['remove_neurons'] else args.modularity['remove_neuron_path']
-    adj_prefix = 'img_{}_adj'
+        base_transform = transforms.Compose([
+            transforms.Resize((224, 224)),
+            transforms.ToTensor(),
+        ])
 
-    base_transform = transforms.Compose([
-        transforms.Resize((224, 224)),
-        transforms.ToTensor(),
-    ])
-    # get the embeddings for the base images
-    all_base_imgs = []
-    all_adj_imgs = []
-    fid = LearnedPerceptualImagePatchSimilarity(net_type='squeeze')
-    for iter in range(len(base_prompts)):
-        # print(os.path.join(base_root, base_prefix.format(iter) + '.jpg'), base_prompts[iter])
-        # print(os.path.join(adj_root, adj_prefix.format(iter) + '.jpg'), adj_prompts[iter])
-        img_base = Image.open(os.path.join(base_root, base_prefix.format(iter) + '.jpg')) # base imahe
-        img_adj = Image.open(os.path.join(adj_root, adj_prefix.format(iter) + '.jpg')) # image after removal
+        # Metric to test for quality of images
+        metric = CLIPIQA(model_name_or_path='clip_iqa', prompts=("quality", "noisiness", "sharpness", test_prompts))
+        scores_dict = intialise_results_dict()
 
-        # Transform images to tensor
-        img_base = base_transform(img_base).unsqueeze(0)
-        img_adj = base_transform(img_adj).unsqueeze(0)
+        for iter in range(len(base_prompts)):
+            # Read base and concept images from folder
+            img_base = Image.open(os.path.join(base_root, base_prefix.format(iter) + '.jpg')) # base image
+            img_concept = Image.open(os.path.join(base_root, adj_prefix.format(iter) + '.jpg')) # concept image
+            # Read image after removal
+            img_concept_removal = Image.open(os.path.join(results_root, after_removal_prefix.format(iter) + '.jpg'))
+            # Transform images to tensor
+            img_base = base_transform(img_base).unsqueeze(0) 
+            img_concept = base_transform(img_concept).unsqueeze(0) 
+            img_concept_removal = base_transform(img_concept_removal).unsqueeze(0)
 
-        fid_score = fid(img_adj, img_base)
-        print(iter, f"FID score: {fid_score}")
+            # Metric for base image
+            clip_iqa_base = metric(img_base)
+            # Metric for concept image
+            clip_iqa_adj = metric(img_concept)
 
-        # convert from 
-        # Multiply by 255 to denormalise the images
-        
-        # img_base = img_base 
-        # img_adj = img_adj
+            # Baseline scores for images generated by model
+            # Quality score is average of quality, beautiful, sharpness
+            # quality_score = (clip_iqa_base['sharpness'] + clip_iqa_base['noisiness'] + clip_iqa_base['user_defined_1'])/3
+            quality_score = clip_iqa_base['quality']
+            scores_dict['base']['quality'][iter] = quality_score.item()
+            scores_dict['base']['concept_sim'][iter] = clip_iqa_base['user_defined_0'].item()
 
-    #     all_base_imgs.append(img_base)
-    #     all_adj_imgs.append(img_adj)
+            # Concept scores for images generated by model
 
-    # all_base_imgs = torch.cat(all_base_imgs, dim=0)
-    # all_adj_imgs = torch.cat(all_adj_imgs, dim=0)
-    # convert to uint8
-    # all_base_imgs = all_base_imgs.to(torch.uint8)
-    # all_adj_imgs = all_adj_imgs.to(torch.uint8)
-    # calculate fid
-    
-    # fid.update(all_base_imgs, real=True)
-    # fid.update(all_adj_imgs, real=False)
-    # fid_score = fid.compute()
-    # fid_score = fid(all_adj_imgs, all_base_imgs)
-    # print(f"FID score: {fid_score}")
+            # quality_score = (clip_iqa_adj['sharpness'] + clip_iqa_adj['noisiness'] + clip_iqa_adj['user_defined_1'])/3
+            quality_score = clip_iqa_adj['quality']
+            scores_dict['concept']['quality'][iter] = quality_score.item()
+            scores_dict['concept']['concept_sim'][iter] = clip_iqa_adj['user_defined_0'].item()
 
-    # save the FID score
-    # with open(os.path.join(args.modularity['remove_neuron_path'], 'fid_score.txt'), 'w') as f:
-    #     f.write(str(fid_score))
+            # Concept removal scores for images generated by model
+            clip_iqa_concept_removal = metric(img_concept_removal)
+            # quality_score = (clip_iqa_concept_removal['sharpness'] + clip_iqa_concept_removal['noisiness'] + clip_iqa_concept_removal['user_defined_1'])/3
+            quality_score = clip_iqa_concept_removal['quality']
+            scores_dict['concept_removal']['quality'][iter] = quality_score.item() 
+            scores_dict['concept_removal']['concept_sim'][iter] = clip_iqa_concept_removal['user_defined_0'].item()
+
+        # Print the results
+        print("Base Quality: ", average_val_dict(scores_dict['base']['quality']))
+        print("Base Concept Similarity: ", average_val_dict(scores_dict['base']['concept_sim']))
+        print("Concept Quality: ", average_val_dict(scores_dict['concept']['quality']))
+        print("Concept Concept Similarity: ", average_val_dict(scores_dict['concept']['concept_sim']))
+        print("Concept Removal Quality: ", average_val_dict(scores_dict['concept_removal']['quality']))
+        print("Concept Removal Concept Similarity: ", average_val_dict(scores_dict['concept_removal']['concept_sim']))
+
+        # Save the results
+        save_path = os.path.join(args.modularity['remove_neuron_path_val'] if 'val' in args.modularity['file_name'] else args.modularity['remove_neuron_path'], 'clip_iqa_scores.json')
+        print("Saving results to: ", save_path)
+        with open(save_path, 'w') as f:
+            json.dump(scores_dict, f)
 
 
-
-
-        # img_base = preprocess(img_base).unsqueeze(0).to(args.gpu)
-        # img_adj = preprocess(img_adj).unsqueeze(0).to(args.gpu)
-
-        
-    #     base_text_feat = base_prompts[iter]
-    #     adj_text_feat = adj_prompts[iter]
-
-    #     with torch.no_grad():
-    #         text_embs = clip.tokenize([base_text_feat, adj_text_feat]).to(args.gpu)
-
-    #         logits_per_image, _ = model(img_base, text_embs)
-    #         base_img_probs = logits_per_image.softmax(dim=-1).cpu().numpy()
-
-    #         logits_per_image, _ = model(img_adj, text_embs)
-    #         adj_img_probs = logits_per_image.softmax(dim=-1).cpu().numpy()
-    #         base_img_label = base_img_probs.argmax()
-    #         adj_img_label = adj_img_probs.argmax()
-
-    #         # consider correct classification for pair if both images are classified correctly
-    #         accuracy = (base_img_label == gt_labels[0].item()) and (adj_img_label == gt_labels[1].item())
-    #         accuracy = int(accuracy)
-    #         if not accuracy:
-    #             wrong_samples.append((base_text_feat, adj_text_feat, base_img_probs, adj_img_probs))
-    #         avg_score += accuracy
-
-    # print(f"Accuracy: {avg_score/len(base_prompts)}")
-
-    # print("Wrong samples")
-    # print(len(wrong_samples))
-    # print(wrong_samples)
 
 
 

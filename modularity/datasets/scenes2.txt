@@ -1,0 +1,10 @@
+garden
+beach
+room
+park
+chair
+table
+bag
+desk
+laptop
+phone
