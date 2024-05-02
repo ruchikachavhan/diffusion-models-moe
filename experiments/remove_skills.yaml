@@ -4,13 +4,13 @@ moefication:
   templates: '%s.%s.attentions.%s.transformer_blocks.0.ff.net.0.proj.weight'
   topk_experts: 0.2
 modularity:
-  adjective: 'naked'
-  file_name: 'humans'
-  keep_nsfw: true
+  adjective: 'cassette player'
+  file_name: 'scenes2'
+  keep_nsfw: false
   concept_removal: true
   condition:
     name: 'wanda'
-    skill_ratio: 0.3
+    skill_ratio: 0.08
     remove_neurons: true
   bounding_box: false
   single_sample_test: false

@@ -1,0 +1,12 @@
+garden
+room
+park
+street
+chair
+bag
+cat 
+dog
+pet
+girl 
+boy
+child

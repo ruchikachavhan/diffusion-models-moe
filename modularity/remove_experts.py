@@ -74,10 +74,10 @@ def remove_experts(adj_prompts, model, neuron_receiver, args, bounding_box, save
         new_im.paste(out_adj, (275,40))
 
         # write the prompt on the image
-        draw = ImageDraw.Draw(new_im)
-        font = ImageFont.load_default(size=15)
-        draw.text((80, 15), ann_adj, (255, 255, 255), font=font)
-        draw.text((350, 15), 'w/o experts', (255, 255, 255), font=font)
+        # draw = ImageDraw.Draw(new_im)
+        # font = ImageFont.load_default(size=15)
+        # draw.text((80, 15), ann_adj, (255, 255, 255), font=font)
+        # draw.text((350, 15), 'w/o experts', (255, 255, 255), font=font)
 
 
         obj_name = base_prompts[iter].split(' ')[-1] if base_prompts is not None else ann_adj
@@ -128,10 +128,10 @@ def main():
     # model, _, _ = modify_ffn_to_experts(model, args)
     
     # remove experts
-    remove_experts(adj_prompts, model, neuron_receiver, args, 
-                   bounding_box=bb_coordinates_layer_adj if args.modularity['bounding_box'] else None, 
-                   save_path=args.modularity['remove_expert_path'] if not args.modularity['condition']['remove_neurons'] else args.modularity['remove_neuron_path'], 
-                     base_prompts=base_prompts, remove_token_idx=remove_token_idx)
+    # remove_experts(adj_prompts, model, neuron_receiver, args, 
+    #                bounding_box=bb_coordinates_layer_adj if args.modularity['bounding_box'] else None, 
+    #                save_path=args.modularity['remove_expert_path'] if not args.modularity['condition']['remove_neurons'] else args.modularity['remove_neuron_path'], 
+    #                  base_prompts=base_prompts, remove_token_idx=remove_token_idx)
 
     # read val_dataset
     if not os.path.exists(f'modularity/datasets/val_things_{adjectives}.txt'):

@@ -5,6 +5,7 @@ import numpy as np
 from diffusers.models.activations import GEGLU, GELU
 from neuron_receivers.base_receiver import BaseNeuronReceiver
 from neuron_receivers.predictivity import NeuronPredictivity
+import pickle
 
 class WandaRemoveNeurons(NeuronPredictivity):
     def __init__(self, seed, path_expert_indx, T, n_layers, replace_fn = GEGLU, keep_nsfw=False, remove_timesteps=None):
@@ -12,11 +13,10 @@ class WandaRemoveNeurons(NeuronPredictivity):
         self.expert_indices = {}
         for j in range(0, n_layers):
             # read .pt file
-            print(os.path.join(path_expert_indx, f'layer_{j}.json'))
-            self.expert_indices[j] = torch.load(os.path.join(path_expert_indx, f'layer_{j}.pt'))
-            # convert to half because of an error
-            self.expert_indices[j] = self.expert_indices[j].half()
-            print(f'layer_{j}.json', self.expert_indices[j].sum())
+            print(os.path.join(path_expert_indx, f'layer_{j}.pkl'))
+            with open(os.path.join(path_expert_indx, f'layer_{j}.pkl'), 'rb') as f:
+                indices = pickle.load(f)
+                self.expert_indices[j] = indices.toarray()
                 
         self.timestep = 0
         self.layer = 0
@@ -25,59 +25,29 @@ class WandaRemoveNeurons(NeuronPredictivity):
         self.remove_timesteps = remove_timesteps
 
     def hook_fn(self, module, input, output):
-        args = (1.0,)
 
         # Change fc1 with mask 
-        old_weights = module.fc1.weight.clone()
-        new_weights = old_weights * (1 - self.expert_indices[int(self.layer%12)].to(old_weights.device))
-        module.fc1.weight = torch.nn.Parameter(new_weights)
-        hidden_states = module.fc1(input[0])
+        old_weights = module.fc2.weight.clone()
+        binary_mask = torch.tensor(self.expert_indices[int(self.layer%self.n_layers)]).to(old_weights.device)
+        new_weights = old_weights * (1 - binary_mask)
 
-        # Replace the weights with old weights
-        module.fc1.weight = torch.nn.Parameter(old_weights)
+        output_dim, input_dim = new_weights.shape
+        proj = torch.nn.Linear(input_dim, output_dim)
+        proj.weight = torch.nn.Parameter(new_weights)
+        proj.bias = module.fc2.bias
 
-        # Apply activation function
+
+        hidden_states = module.fc1(input[0])       
         hidden_states = module.activation_fn(hidden_states)
+        # Pass through modified fc2 weights
+        hidden_states = proj(hidden_states)
 
-        hidden_states = module.fc2(hidden_states)
+        assert hidden_states.shape == output.shape, f"Hidden states shape {hidden_states.shape} should be equal to output shape {output.shape}"
+
         self.update_layer()
         return hidden_states
     
-        # # get hidden state
-        # if self.replace_fn == GEGLU:
-        #     # Change the projection matrix, multiply the binary mask with the weights of the projection matrix
-        #     # last half of te projection matrix
-        #     # if self.timestep < 20:
-        #     old_weights = module.proj.weight[module.proj.weight.shape[0]//2:, :].clone()
-        #     # pruning
-        #     new_weights = old_weights * (1 - self.expert_indices[self.timestep][self.layer].to(old_weights.device))
-        #     module.proj.weight[module.proj.weight.shape[0]//2:, :] = new_weights
-                            
-        #     hidden_states, gate = module.proj(input[0], *args).chunk(2, dim=-1)
-
-        #     # replace the weights with old weights
-        #     module.proj.weight[module.proj.weight.shape[0]//2:, :] = old_weights
-            
-        #     # apply gelu
-        #     gate = module.gelu(gate)
-                
-        #     hidden_states = hidden_states * gate
-        #     self.gates.append(gate.detach().cpu())
-
-        # elif self.replace_fn == GELU:
-        #     hidden_states = module.proj(input[0])
-        #     hidden_states = module.gelu(hidden_states)
-        #     expert_indx = self.expert_indices[self.timestep][self.layer]
-        #     if len(expert_indx) > 0:
-        #         if self.timestep <= 5:
-        #             indx = torch.where(torch.tensor(expert_indx) == 1)[0]
-        #             hidden_states[:, :, indx] = 0
-            
-        #     self.gates.append(hidden_states.detach().cpu())
-
-        # self.update_time_layer()
-
-        # return hidden_states
+      
     
     
     def test(self, model, ann = 'an white cat', relu_condition = False):

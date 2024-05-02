@@ -13,7 +13,7 @@ def get_prompts(args):
         things = f.readlines()
         things = [t.strip() for t in things]
     # add an adjective of choice to every element in things list
-    adjectives = args.modularity['adjective'].split(",")
+    adjectives = [args.modularity['adjective']]
     if len(adjectives) == 1:
         base_prompts = [f'a {thing}' for thing in things]
 
@@ -60,6 +60,10 @@ def get_prompts(args):
         elif adjectives[0] in ['scene_removal_cat']:
             base_prompts = [f'a {thing}' for thing in things]
             adj_prompts = [f'a {thing} with a cat' for thing in things]
+            remove_token_idx = [3, 4, 5]
+        elif adjectives[0] in ['cassette player']:
+            base_prompts = [f'a photo of a {thing}' for thing in things]
+            adj_prompts = [f'a photo of a {adjectives[0]}' for _ in things]
             remove_token_idx = [3, 4, 5]
         
         elif adjectives[0] in ['memorize']:

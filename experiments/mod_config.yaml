@@ -1,13 +1,13 @@
 moefication: null
 modularity:
-  adjective: 'naked'
-  file_name: 'humans'
+  adjective: 'cassette player'
+  file_name: 'things'
   keep_nsfw: false
   concept_removal: true
   predictvity_for: 'neuron'
   condition:
     name: 'wanda'
-    skill_ratio: 0.3
+    skill_ratio: 0.08
     remove_neurons: false
   bounding_box: false
   single_sample_test: false

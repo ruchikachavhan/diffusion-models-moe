@@ -29,13 +29,15 @@ class Wanda(BaseNeuronReceiver):
         '''
         Store the norm of the input for each layer
         '''
-        save_gate = input[0].clone().detach().cpu()
-        save_gate = save_gate.view(-1, input[0].shape[-1])
+        
+        hidden_states = module.activation_fn(hidden_states)
+
+        save_gate = hidden_states.clone().detach().cpu()
+        save_gate = save_gate.view(-1, hidden_states.shape[-1])
         save_gate = torch.nn.functional.normalize(save_gate, p=2, dim=1)
         if self.layer < self.n_layers:
             self.predictivity[self.layer].add_rows(save_gate)
-        
-        hidden_states = module.activation_fn(hidden_states)
+
         hidden_states = module.fc2(hidden_states)
         self.update_layer()
         return hidden_states
