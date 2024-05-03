@@ -10,7 +10,9 @@ sys.path.append(os.getcwd())
 import utils
 from neuron_receivers import Wanda
 from PIL import Image 
-from diffusers.models.activations import LoRACompatibleLinear
+from diffusers.models.lora import LoRACompatibleLinear
+import scipy
+import pickle
 
 def main():
     args = utils.Config('experiments/mod_config.yaml', 'modularity')
@@ -25,16 +27,19 @@ def main():
 
     # Model
     model, num_geglu, replace_fn = utils.get_sd_model(args)
+    model = model.to(args.gpu)
+    
     args.replace_fn = replace_fn
     print("Replce fn: ", replace_fn)
     model = model.to(args.gpu)
+    print(model.unet)
 
     # get the norm of the weights
     gate_weights = {}
     layer_names = []
 
     for name, module in model.unet.named_modules():
-            if isinstance(module, LoRACompatibleLinear) and 'ff.net' in name and not 'proj' in name:
+            if isinstance(module, torch.nn.Linear) and 'ff.net' in name and not 'proj' in name:
             # if isinstance(module, args.replace_fn) and 'ff.net' in name:
                 layer_names.append(name)
                 print("Name: ", name, module.weight.shape)
@@ -107,31 +112,41 @@ def main():
             binary_mask = torch.zeros_like(gate_weights[layer_names[l]])
             diff = metric_adj > metric_base
             binary_mask = diff * binary_mask_adj
-            binary_mask = binary_mask.float()
-            indices = binary_mask.nonzero()
+            binary_mask = binary_mask.int()
+
+            # convert binary mask to scipt csr matrix
+            binary_mask = scipy.sparse.csr_matrix(binary_mask.numpy())
+            # save the binary mask in pickle file
+            if not os.path.exists(args.modularity['skill_neuron_path']):
+                os.makedirs(args.modularity['skill_neuron_path'])
+            print("Binary mask: ", binary_mask.mean(), binary_mask.shape)
+            with open(os.path.join(args.modularity['skill_neuron_path'], f'timestep_{t}_layer_{l}.pkl'), 'wb') as f:
+                pickle.dump(binary_mask, f)
+
+            # indices = binary_mask.nonzero()
             # print(binary_mask.mean(), binary_mask.shape)
             # print("Indices: ", indices)
 
             # save the binary mask indices that are non-zero
-            if not os.path.exists(args.modularity['skill_neuron_path']):
-                os.makedirs(args.modularity['skill_neuron_path'])
+            # if not os.path.exists(args.modularity['skill_neuron_path']):
+            #     os.makedirs(args.modularity['skill_neuron_path'])
 
-            # save indices in json file
-            with open(os.path.join(args.modularity['skill_neuron_path'], f'timestep_{t}_layer_{l}.json'), 'w') as f:
-                json.dump(indices.tolist(), f)
+            # # save indices in json file
+            # with open(os.path.join(args.modularity['skill_neuron_path'], f'timestep_{t}_layer_{l}.json'), 'w') as f:
+            #     json.dump(indices.tolist(), f)
             
-            # unskilled weights 
-            diff = metric_base > metric_adj
-            binary_mask = diff * binary_mask_adj
-            binary_mask = binary_mask.float()
-            indices = binary_mask.nonzero()
+            # # unskilled weights 
+            # diff = metric_base > metric_adj
+            # binary_mask = diff * binary_mask_adj
+            # binary_mask = binary_mask.float()
+            # indices = binary_mask.nonzero()
 
-            if not os.path.exists(os.path.join(args.modularity['skill_neuron_path'], f'random_unskilled')):
-                        os.makedirs(os.path.join(args.modularity['skill_neuron_path'], f'random_unskilled'))
+            # if not os.path.exists(os.path.join(args.modularity['skill_neuron_path'], f'random_unskilled')):
+            #             os.makedirs(os.path.join(args.modularity['skill_neuron_path'], f'random_unskilled'))
             
-            # save indices in json file
-            with open(os.path.join(args.modularity['skill_neuron_path'], f'random_unskilled/timestep_{t}_layer_{l}.json'), 'w') as f:
-                json.dump(indices.tolist(), f)
+            # # save indices in json file
+            # with open(os.path.join(args.modularity['skill_neuron_path'], f'random_unskilled/timestep_{t}_layer_{l}.json'), 'w') as f:
+            #     json.dump(indices.tolist(), f)
 
 
 

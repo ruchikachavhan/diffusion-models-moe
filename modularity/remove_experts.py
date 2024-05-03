@@ -8,7 +8,7 @@ from mod_utils import get_prompts, LLAVAScorer
 sys.path.append(os.getcwd())
 import utils
 import eval_coco as ec
-from diffusers.models.activations import LoRACompatibleLinear
+from diffusers.models.lora import LoRACompatibleLinear
 from neuron_receivers import RemoveExperts, RemoveNeurons, WandaRemoveNeurons, WandaRemoveNeuronsFast
 sys.path.append('moefication')
 from helper import modify_ffn_to_experts
@@ -126,7 +126,7 @@ def main():
 
     weights_shape = {}
     for name, module in model.unet.named_modules():
-        if isinstance(module, LoRACompatibleLinear) and 'ff.net' in name and not 'proj' in name:
+        if isinstance(module, torch.nn.Linear) and 'ff.net' in name and not 'proj' in name:
             weights_shape[name] = module.weight.shape
     # sort keys
     weights_shape = dict(sorted(weights_shape.items()))

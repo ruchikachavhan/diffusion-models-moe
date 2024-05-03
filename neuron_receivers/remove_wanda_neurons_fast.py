@@ -5,11 +5,11 @@ import numpy as np
 from diffusers.models.activations import GEGLU, GELU
 from neuron_receivers.base_receiver import BaseNeuronReceiver
 from neuron_receivers.predictivity import NeuronPredictivity
-from diffusers.models.activations import LoRACompatibleLinear
+from diffusers.models.lora import LoRACompatibleLinear
 import pickle
 
 class WandaRemoveNeuronsFast(NeuronPredictivity):
-    def __init__(self, seed, path_expert_indx, T, n_layers, replace_fn = GEGLU, keep_nsfw=False, remove_timesteps=None, weights_shape=None):
+    def __init__(self, seed, path_expert_indx, T, n_layers, replace_fn = GEGLU, keep_nsfw=False, remove_timesteps=51, weights_shape=None):
         super(WandaRemoveNeuronsFast, self).__init__(seed, T, n_layers, replace_fn, keep_nsfw)
         self.expert_indices = {}
         for i in range(0, T):
@@ -20,7 +20,7 @@ class WandaRemoveNeuronsFast(NeuronPredictivity):
                     # load sparse matrix from pickle file
                     indices = pickle.load(f)
                     # convert to array
-                    self.expert_indices[i][j] = indices.toarray()
+                    self.expert_indices[i][j] = torch.tensor(indices.toarray())
                 
         self.timestep = 0
         self.layer = 0
@@ -70,19 +70,26 @@ class WandaRemoveNeuronsFast(NeuronPredictivity):
         # Linear (lora compatible layer)
         # change wieghts by applying the binary mask
         old_weights = module.weight.clone()
-        # read the expert indices
-        binary_mask = self.expert_indices[self.timestep][self.layer]
-        binary_mask = torch.tensor(binary_mask).to(old_weights.device)
-        new_weights = old_weights * (1 - binary_mask)
 
-        # Apply the forward pass with matrix multiplication
-        output_dim, input_dim = new_weights.shape
-        proj = torch.nn.Linear(input_dim, output_dim)
-        # copy the weights into proj
-        proj.weight = torch.nn.Parameter(new_weights)
-        proj.bias = torch.nn.Parameter(module.bias)
-        hidden_states = proj(input[0])
-        assert hidden_states.shape == output.shape, "Output shape should be same as hidden states"
+        if self.timestep < self.remove_timesteps and self.remove_timesteps is not None:
+            # read the expert indices
+            binary_mask = self.expert_indices[self.timestep][self.layer]
+            binary_mask = binary_mask.to(old_weights.device)
+            new_weights = old_weights * (1 - binary_mask)
+
+            # Apply the forward pass with matrix multiplication
+            # output_dim, input_dim = new_weights.shape
+            # implement matrix multiplication in torch.nn.Linear 
+            hidden_states = torch.nn.functional.linear(input[0], new_weights, module.bias)
+
+            # copy the weights into proj
+            # proj.weight = torch.nn.Parameter(new_weights)
+            # proj.bias = torch.nn.Parameter(module.bias)
+            # hidden_states = proj(input[0])
+            # assert hidden_states.shape == output.shape, "Output shape should be same as hidden states"
+        else:
+            # use old weights
+            hidden_states = torch.nn.functional.linear(input[0], old_weights, module.bias)
         
         # replace the weights with old weights
         self.update_time_layer()
@@ -94,7 +101,7 @@ class WandaRemoveNeuronsFast(NeuronPredictivity):
         hooks = []
         num_modules = 0
         for name, module in model.unet.named_modules():
-            if isinstance(module, LoRACompatibleLinear) and 'ff.net' in name and not 'proj' in name:
+            if isinstance(module, torch.nn.Linear) and 'ff.net' in name and not 'proj' in name:
                 hook = module.register_forward_hook(self.linear_hook_fn)
                 num_modules += 1
                 hooks.append(hook)
@@ -103,7 +110,12 @@ class WandaRemoveNeuronsFast(NeuronPredictivity):
         #  fix seed to get the same output for every run
         torch.manual_seed(self.seed)
         np.random.seed(self.seed)
-        out = model(ann).images[0]
+
+        # to account for batches
+        if isinstance(ann, list):
+            out = model(ann).images
+        else:
+            out = model(ann).images[0]
 
         # remove the hook
         self.remove_hooks(hooks)

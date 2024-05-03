@@ -31,7 +31,7 @@ class Wanda(BaseNeuronReceiver):
         # save the out
         args = (1.0,)
         if self.replace_fn == GEGLU:
-            hidden_states, gate = module.proj(input[0], *args).chunk(2, dim=-1)
+            hidden_states, gate = module.proj(input[0]).chunk(2, dim=-1)
             ''' 
             Store the norm of the gate for each layer and timestep in the predictivity object 
             '''

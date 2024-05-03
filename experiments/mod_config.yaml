@@ -1,13 +1,13 @@
 moefication: null
 modularity:
-  adjective: 'gender_female'
-  file_name: 'professions_male'
+  adjective: 'naked'
+  file_name: 'things'
   keep_nsfw: false
   concept_removal: true
   predictvity_for: 'neuron'
   condition:
     name: 'wanda'
-    skill_ratio: 0.003
+    skill_ratio: 0.02
     remove_neurons: false
   bounding_box: false
   single_sample_test: false

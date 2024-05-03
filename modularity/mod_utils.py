@@ -76,6 +76,9 @@ def get_prompts(args):
     elif adjectives in ['memorize']:
         base_prompts = ['' for _ in things]
         adj_prompts = [f'{thing}' for thing in things]
+    else:
+        base_prompts = [f'a photo of a {thing}' for thing in things]
+        adj_prompts = [f'a {thing} in the style of {adjectives}' for thing in things]
 
     # elif len(adjectives) == 2:
     #     # consider the first adjective as base prompt

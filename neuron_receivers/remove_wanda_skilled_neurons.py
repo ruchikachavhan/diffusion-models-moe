@@ -5,7 +5,7 @@ import numpy as np
 from diffusers.models.activations import GEGLU, GELU
 from neuron_receivers.base_receiver import BaseNeuronReceiver
 from neuron_receivers.predictivity import NeuronPredictivity
-from diffusers.models.activations import LoRACompatibleLinear
+from diffusers.models.lora import LoRACompatibleLinear
 
 class WandaRemoveNeurons(NeuronPredictivity):
     def __init__(self, seed, path_expert_indx, T, n_layers, replace_fn = GEGLU, keep_nsfw=False, remove_timesteps=None, weights_shape=None):
@@ -107,7 +107,11 @@ class WandaRemoveNeurons(NeuronPredictivity):
         #  fix seed to get the same output for every run
         torch.manual_seed(self.seed)
         np.random.seed(self.seed)
-        out = model(ann).images[0]
+
+        if len(ann) > 1:
+            out - model(ann).images
+        elif len(ann) == 1:
+            out = model(ann).images[0]
 
         # remove the hook
         self.remove_hooks(hooks)

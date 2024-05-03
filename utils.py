@@ -12,7 +12,7 @@ from diffusers.models.activations import GEGLU, GELU
 from diffusers import UNet2DConditionModel, DiffusionPipeline, LCMScheduler, EulerDiscreteScheduler, DPMSolverMultistepScheduler
 from relufy_model import find_and_change_geglu
 from transformers.models.clip.modeling_clip import CLIPMLP
-from sld import SLDPipeline
+# from sld import SLDPipeline
 
 def make_dirs(args):
     if not os.path.exists('test_images'):
