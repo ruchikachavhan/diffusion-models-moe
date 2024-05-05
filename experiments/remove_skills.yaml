@@ -4,13 +4,13 @@ moefication:
   templates: '%s.%s.attentions.%s.transformer_blocks.0.ff.net.0.proj.weight'
   topk_experts: 0.2
 modularity:
-  adjective: 'gender_female'
-  file_name: 'female_professions'
+  adjective: 'gender'
+  file_name: 'male_professions'
   keep_nsfw: false
   concept_removal: true
   condition:
     name: 'wanda'
-    skill_ratio: 0.003
+    skill_ratio: 0.02
     remove_neurons: true
   bounding_box: false
   single_sample_test: false

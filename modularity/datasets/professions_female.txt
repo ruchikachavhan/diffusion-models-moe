@@ -6,3 +6,19 @@ student
 hair dresser
 secretary
 housekeeper
+nthropologist
+Art Critic
+Art Therapist
+Astronomer
+Athlete
+Botanist
+Business Analyst
+Chemist
+Choreographer
+Copywriter
+Costume Designer
+Customer Service Representative
+Dance Instructor
+Dermatologist
+Environmental Scientist
+Event Planner

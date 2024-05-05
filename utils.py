@@ -174,7 +174,10 @@ class Config:
 
         # Folders fo modularity experiments 
         if exp_name == 'modularity':  
-            self.save_path = os.path.join(self.res_path, self.model_id, exp_name, self.modularity['adjective'])
+            if self.modularity['adjective'] in ['gender', 'gender_female', 'scene_removal_cat', 'Cassette Player', 'naked', 'memorize', 'art10', 'art10_naked']:
+                self.save_path = os.path.join(self.res_path, self.model_id, exp_name, self.modularity['adjective'])
+            else:
+                self.save_path = os.path.join(self.res_path, self.model_id, exp_name, 'art', self.modularity['adjective'])
 
         if self.modularity is not None:
             self.modularity['img_save_path'] = os.path.join(self.save_path, 'images')

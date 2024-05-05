@@ -63,19 +63,24 @@ def get_prompts(args):
         adj_prompts = [f'a photo of a {thing}' for thing in things]
 
     elif adjectives in ['gender_female']:
-        base_prompts = [f'a photo of a {thing}' for thing in things]
-        adj_prompts = [f'a photo of a {thing}' for thing in things]
+        base_prompts = [f'a photo of a male {thing}' for thing in things]
+        adj_prompts = [f'a photo of a female {thing}' for thing in things]
 
     elif adjectives in ['scene_removal_cat']:
         base_prompts = [f'a {thing}' for thing in things]
         adj_prompts = [f'a {thing} with a cat' for thing in things]
+
     elif adjectives in ['Cassette Player', 'Chain Saw', 'Church', 'Gas Pump', 'Tench', 'Garbage Truck', 'English Springer', 'Golf Ball', 'Parachute', 'French Horn']:
-        base_prompts = [f"a {thing}" for thing in things]
-        adj_prompts = [f'a {thing} with a {adjectives}' for thing in things]
+        base_prompts = [f'a photo of a {thing}' for thing in things]
+        adj_prompts = [f'a photo of a {adjectives}' for _ in things]
     
     elif adjectives in ['memorize']:
         base_prompts = ['' for _ in things]
         adj_prompts = [f'{thing}' for thing in things]
+    
+    else:
+        base_prompts = [f'a photo of a {thing}' for thing in things]
+        adj_prompts = [f'a {thing} in the style of {adjectives}' for thing in things]
 
     # elif len(adjectives) == 2:
     #     # consider the first adjective as base prompt

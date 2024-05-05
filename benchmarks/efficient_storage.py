@@ -39,7 +39,8 @@ concepts = {
     # 'Pablo Picasso': 'artist',
     # 'naked': 'naked'
     # 'memorize': 'memorize'
-    'gender_female': 'gender_female'
+    # 'gender_female': 'gender_female'
+    'Cassette Player': 'Cassette player',
 }
 
 
@@ -48,7 +49,7 @@ def main():
     timesteps = 51
     n_layers = 16
     for c in concepts_list:
-        root = f'results/results_seed_0/stable-diffusion/baseline/runwayml/stable-diffusion-v1-5/modularity/{c}/skilled_neuron_wanda/0.003'
+        root = f'results/results_seed_0/stable-diffusion/baseline/runwayml/stable-diffusion-v1-5/modularity/{c}/skilled_neuron_wanda/0.08'
         # read indices in the file
         print(root)
 

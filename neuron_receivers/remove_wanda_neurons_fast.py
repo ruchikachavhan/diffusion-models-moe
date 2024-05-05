@@ -20,7 +20,7 @@ class WandaRemoveNeuronsFast(NeuronPredictivity):
                     # load sparse matrix from pickle file
                     indices = pickle.load(f)
                     # convert to array
-                    self.expert_indices[i][j] = indices.toarray()
+                    self.expert_indices[i][j] = torch.tensor(indices.toarray())
                 
         self.timestep = 0
         self.layer = 0
@@ -70,18 +70,22 @@ class WandaRemoveNeuronsFast(NeuronPredictivity):
         # Linear (lora compatible layer)
         # change wieghts by applying the binary mask
         old_weights = module.weight.clone()
-        # read the expert indices
+            # read the expert indices
         binary_mask = self.expert_indices[self.timestep][self.layer]
-        binary_mask = torch.tensor(binary_mask).to(old_weights.device)
+        binary_mask = binary_mask.to(old_weights.device)
         new_weights = old_weights * (1 - binary_mask)
 
+        hidden_states = torch.nn.functional.linear(input[0], new_weights, module.bias)
+        # else:
+        #     hidden_states = torch.nn.functional.linear(input[0], old_weights, module.bias)
+
         # Apply the forward pass with matrix multiplication
-        output_dim, input_dim = new_weights.shape
-        proj = torch.nn.Linear(input_dim, output_dim)
-        # copy the weights into proj
-        proj.weight = torch.nn.Parameter(new_weights)
-        proj.bias = torch.nn.Parameter(module.bias)
-        hidden_states = proj(input[0])
+        # output_dim, input_dim = new_weights.shape
+        # proj = torch.nn.Linear(input_dim, output_dim)
+        # # copy the weights into proj
+        # proj.weight = torch.nn.Parameter(new_weights)
+        # proj.bias = torch.nn.Parameter(module.bias)
+        # hidden_states = proj(input[0])
         assert hidden_states.shape == output.shape, "Output shape should be same as hidden states"
         
         # replace the weights with old weights
@@ -103,7 +107,10 @@ class WandaRemoveNeuronsFast(NeuronPredictivity):
         #  fix seed to get the same output for every run
         torch.manual_seed(self.seed)
         np.random.seed(self.seed)
-        out = model(ann).images[0]
+        if isinstance(ann, list):
+            out = model(ann).images
+        else:
+            out = model(ann).images[0]
 
         # remove the hook
         self.remove_hooks(hooks)
@@ -127,7 +134,10 @@ class WandaRemoveNeuronsFast(NeuronPredictivity):
         #  fix seed to get the same output
         torch.manual_seed(self.seed)
         np.random.seed(self.seed)
-        out = model(ann).images[0]
+        if isinstance(ann, list):
+            out = model(ann).images
+        else:
+            out = model(ann).images[0]
 
         # remove the hook
         self.remove_hooks(hooks)
