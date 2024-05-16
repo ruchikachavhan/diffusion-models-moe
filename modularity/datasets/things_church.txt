@@ -1,0 +1,9 @@
+building
+house
+apartment
+temple
+room
+school
+skyscraper
+wall
+tower

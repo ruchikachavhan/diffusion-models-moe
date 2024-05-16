@@ -124,24 +124,15 @@ def main():
     args.replace_fn = replace_fn
     model = model.to(args.gpu)
 
-    weights_shape = {}
-    for name, module in model.unet.named_modules():
-        if isinstance(module, LoRACompatibleLinear) and 'ff.net' in name and not 'proj' in name:
-            weights_shape[name] = module.weight.shape
-    # sort keys
-    weights_shape = dict(sorted(weights_shape.items()))
-    weights_shape = [weights_shape[key] for key in weights_shape.keys()]
-    print("Weights shape: ", weights_shape)
 
-    # Neuron receiver with forward hooks
+    args.timesteps = 1 if args.hook_module == 'text' else args.timesteps
     
-    if args.modularity['condition']['name'] == 't_test':
+    if args.modularity['condition']['name'] in ['t_test', 'AP']:
         func = RemoveNeurons if args.modularity['condition']['remove_neurons'] else RemoveExperts
     elif args.modularity['condition']['name'] == 'wanda':
         func = WandaRemoveNeuronsFast
     neuron_receiver =  func(seed=args.seed, path_expert_indx = args.modularity['skill_expert_path'] if not args.modularity['condition']['remove_neurons'] else args.modularity['skill_neuron_path'],
-                            T=args.timesteps, n_layers=num_geglu, replace_fn=replace_fn, keep_nsfw=args.modularity['keep_nsfw'], 
-                            remove_timesteps = hparams, weights_shape = weights_shape)
+                            T=args.timesteps, n_layers=num_geglu, replace_fn=replace_fn, keep_nsfw=args.modularity['keep_nsfw'])
                                            
     # adjectives = args.modularity['adjective']
     # base_prompts, adj_prompts, _ = get_prompts(args)
@@ -158,12 +149,7 @@ def main():
             print(bb_coordinates_layer_adj.keys())
         with open(os.path.join(args.save_path, 'bb_coordinates_layer_base.json')) as f:
             bb_coordinates_layer_base = json.load(f)
-    # COnvert FFns into moe
-    # set args.moefication['topk_experts'] = 1 to keep all the experts  
-    # so that all experts are being used in the model and the ones removed are the skilled ones
-    # args.moefication['topk_experts'] = 1.0
-    # model, _, _ = modify_ffn_to_experts(model, args)
-    
+
     # remove experts
     remove_experts(adj_prompts, model, neuron_receiver, args, 
                    bounding_box=bb_coordinates_layer_adj if args.modularity['bounding_box'] else None, 

@@ -92,7 +92,7 @@ def args_parser():
     args.add_argument('--gpu', type=int, default=7, help='gpu')
     args.add_argument('--n_layers', type=int, default=16, help='n layers')
     args.add_argument('--fine_tuned_unet', default=None, help='fine tuned unet')
-    args.add_argument('--concepts_to_remove', default=None, help='List of concepts to remove')
+    args.add_argument('--concepts_to_remove', default='naked', help='List of concepts to remove')
     args.add_argument('--dataset_type', default='i2p', help='dataset path')
     args.add_argument('--root-template', default='results/results_seed_%s/stable-diffusion/baseline/runwayml/stable-diffusion-v1-5/modularity/%s', help='root template')
     args.add_argument('--timesteps', default=51, type=int, help='Timesteps')
@@ -105,12 +105,27 @@ def args_parser():
 def main():
 
     args = args_parser()
-    # Load the I2P dataset
-    dataset = load_dataset("AIML-TUDA/i2p")['train']
 
-    print("Dataset: ", len(dataset))
-    # Iterate over the dataset and select with nudity percentage greater than 20
-    prompts = dataset['prompt']
+    if args.dataset_type == 'i2p':
+        # Load the I2P dataset
+        dataset = load_dataset("AIML-TUDA/i2p")['train']
+        prompts = dataset['prompt']
+    elif args.dataset_type == 'mma':
+        # If the dataset is gated/private, make sure you have run huggingface-cli login
+        dataset = load_dataset("YijunYang280/MMA-Diffusion-NSFW-adv-prompts-benchmark")
+        print(dataset)
+        prompts = dataset['train']['adv_prompt']
+    elif args.dataset_type == 'ring-a-bell':
+        file_name = 'modularity/datasets/Nudity_ring-a-bell.csv'
+        # read file
+        prompts = []
+        with open(file_name, 'r') as f:
+            lines = f.readlines()
+            for line in lines:
+                prompts.append(line.strip())
+
+    print("Dataset: ", len(prompts))
+    
 
     model = StableDiffusionPipeline.from_pretrained(args.model_id, torch_dtype=torch.float16)
     model = model.to(args.gpu)
@@ -169,6 +184,15 @@ def main():
         output_path = f'benchmarking results/{args.fine_tuned_unet}/{args.dataset_type}/{args.concepts_to_remove}'
         remover_model = remover_model.to(args.gpu)
 
+    if args.fine_tuned_unet == 'union-timesteps':
+        unet = UNet2DConditionModel.from_pretrained('runwayml/stable-diffusion-v1-5', subfolder="unet", torch_dtype=torch.float16)
+        root_template = 'results/results_seed_0/stable-diffusion/baseline/runwayml/stable-diffusion-v1-5'
+        best_ckpt_path = os.path.join(root_template, 'checkpoints', 'naked_less_than_10.pt')
+        unet.load_state_dict(torch.load(best_ckpt_path))
+        remover_model = StableDiffusionPipeline.from_pretrained('runwayml/stable-diffusion-v1-5', unet=unet, torch_dtype=torch.float16)
+        output_path = f'benchmarking results/{args.fine_tuned_unet}/{args.dataset_type}/{args.concepts_to_remove}_less_than_10'
+        remover_model = remover_model.to(args.gpu)
+
     if args.fine_tuned_unet is None:
         # initalise Wanda neuron remover
         path_expert_indx = os.path.join(args.root_template % (str(args.seed), args.concepts_to_remove), 'skilled_neuron_wanda', '0.01')
@@ -194,10 +218,11 @@ def main():
         print("Batch: ", batch)
         # check if image already exists
         if not os.path.exists(os.path.join(output_path, f'{i}.jpg')):
+        # if True:
             # only generate the images if they do not exist
             torch.manual_seed(args.seed)
             np.random.seed(args.seed) 
-            if args.fine_tuned_unet in ['uce', 'selective-amnesia', 'concept-ablation', 'esd', 'CompVis/stable-diffusion-v1-4-safe', 'stabilityai/stable-diffusion-2', 'stabilityai/stable-diffusion-2-1']:
+            if args.fine_tuned_unet in ['union-timesteps', 'uce', 'selective-amnesia', 'concept-ablation', 'esd', 'CompVis/stable-diffusion-v1-4-safe', 'stabilityai/stable-diffusion-2', 'stabilityai/stable-diffusion-2-1']:
                 # remove the concepts
                 images = remover_model(batch, safety_checker=safety_checker_).images
             else:

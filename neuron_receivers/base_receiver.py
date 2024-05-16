@@ -2,6 +2,7 @@ import torch
 import numpy as np
 from diffusers.models.activations import GEGLU, GELU
 from diffusers.pipelines.stable_diffusion import safety_checker
+from transformers.models.clip.modeling_clip import CLIPMLP
 
 def sc(self, clip_input, images):
     return images, [False for i in images]
@@ -10,7 +11,7 @@ class BaseNeuronReceiver:
     '''
     This is the base class for storing and changing activation functions
     '''
-    def __init__(self, seed = 0, replace_fn = GEGLU, keep_nsfw = False):
+    def __init__(self, seed = 0, replace_fn = GEGLU, keep_nsfw = False, hook_module='unet'):
         self.seed = seed
         self.gates = []
         self.hidden_states = []
@@ -21,12 +22,17 @@ class BaseNeuronReceiver:
             safety_checker.StableDiffusionSafetyChecker.forward = sc
         self.safety_checker = safety_checker.StableDiffusionSafetyChecker
         self.replace_fn = replace_fn
+        self.hook_module = hook_module
         
     
     def hook_fn(self, module, input, output):
         # custom hook function
         raise NotImplementedError
 
+    def text_hook_fn(self, module, input, output):
+        # custom hook function
+        raise NotImplementedError
+    
     def remove_hooks(self, hooks):
         for hook in hooks:
             hook.remove()
@@ -37,17 +43,28 @@ class BaseNeuronReceiver:
         self.gates = []
 
         # hook the model
-        num_modules = 0
-        for name, module in model.unet.named_modules():
-            if isinstance(module, self.replace_fn) and 'ff.net' in name:
-                hook = module.register_forward_hook(self.hook_fn)
-                num_modules += 1
-                hooks.append(hook)
-                if bboxes is not None:
-                    module.bounding_box = bboxes[name + '.proj.weight']
-                else:
-                    module.bounding_box = None
-
+        if self.hook_module == 'unet':
+            # hook the unet
+            num_modules = 0
+            for name, module in model.unet.named_modules():
+                if isinstance(module, self.replace_fn) and 'ff.net' in name:
+                    hook = module.register_forward_hook(self.hook_fn)
+                    num_modules += 1
+                    hooks.append(hook)
+                    if bboxes is not None:
+                        module.bounding_box = bboxes[name + '.proj.weight']
+                    else:
+                        module.bounding_box = None
+    
+        elif self.hook_module == 'text':
+            # hook the text encoder
+            num_modules = 0
+            for name, module in model.text_encoder.named_modules():
+                if isinstance(module, CLIPMLP) and 'mlp' in name and 'encoder.layers' in name:
+                    hook = module.register_forward_hook(self.text_hook_fn)
+                    num_modules += 1
+                    hooks.append(hook)
+                
         # forward pass
         #  fix seed to get the same output for every run
         torch.manual_seed(self.seed)

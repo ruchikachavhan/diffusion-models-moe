@@ -59,12 +59,49 @@ wanda_thr = {
     '10artists': 0.95,
     'Juliana Huxtable,Valerie Hegarty,Wendy Froud,Kobayashi Kiyochika,Paul Laffoley': 0.02
 }
+best_ckpt_dict = {
+    'Van Gogh': 'Van Gogh_0.0.pt',
+    'Monet': 'Monet_0.0.pt',
+    'Pablo Picasso': 'Pablo Picasso_0.0.pt',
+    'Salvador Dali': 'Salvador Dali_0.4.pt',
+    'Leonardo Da Vinci': 'Leonardo Da Vinci_0.0.pt',
+    'all_imagenette_objects': 'all_imagenette_objects.pt',
+}
 uce_models_dict = {
     '50artists': 'erased-50artists-towards_art-preserve_true-sd_1_4-method_replace.pt',
     '1artist': 'erased-algernon blackwood-towards_art-preserve_true-sd_1_4-method_replace.pt',
     '10artists': 'erased-asger jorn_eric fischl_johannes vermeer_apollinary vasnetsov_naoki urasawa_nicolas mignard_john whitcomb_john constable_warwick globe_albert marquet-towards_art-preserve_true-sd_1_4-method_replace.pt',
     '5artists': 'erased-juliana huxtable_valerie hegarty_wendy froud_kobayashi kiyochika_paul laffoley-towards_art-preserve_true-sd_1_4-method_replace.pt',
+    '100artists': 'erased-100artists-towards_art-preserve_true-sd_1_4-method_replace.pt',
+    'Van Gogh': 'erased-van gogh-towards_art-preserve_true-sd_1_4-method_replace.pt',
+    'Monet': 'erased-claude monet-towards_art-preserve_true-sd_1_4-method_replace.pt',
+    'Pablo Picasso': 'erased-pablo picasso-towards_art-preserve_true-sd_1_4-method_replace.pt',
+    'Salvador Dali': 'erased-salvador dali-towards_art-preserve_true-sd_1_4-method_replace.pt',
+    'Leonardo Da Vinci': 'erased-leonardo da vinci-towards_art-preserve_true-sd_1_4-method_replace.pt',
+    'Rembrandt': 'erased-rembrandt-towards_art-preserve_true-sd_1_4-method_replace.pt',
 }
+
+concept_ablation_dict = {
+    'Van Gogh': 'vangogh',
+    'Monet': 'monet',
+    'Pablo Picasso': 'picasso',
+    'Salvador Dali': 'salvador_dali',
+    'Leonardo Da Vinci': 'davinci',
+    'Rembrandt': 'rembrandt',
+}
+
+fmn_model_dict = {
+    'Van Gogh': '../Forget-Me-Not/exps_attn/vincent-van-gogh',
+    'Monet': '../Forget-Me-Not/exps_attn/claude-monet',
+    'Pablo Picasso': '../Forget-Me-Not/exps_attn/pablo-picasso',
+    'Salvador Dali': '../Forget-Me-Not/exps_attn/salvador-dali',
+    'Leonardo Da Vinci': '../Forget-Me-Not/exps_attn/leonardo-da-vinci',
+    'Rembrandt': '../Forget-Me-Not/exps_attn/rembrandt',
+
+} 
+best_paths = os.listdir('eval_checkpoints')
+best_paths = {path.split('_')[0]: path for path in best_paths}
+
 # make dataloader for coco
 class COCODataset(torch.utils.data.Dataset):
     def __init__(self, imgs, anns, transform):
@@ -83,9 +120,8 @@ class COCODataset(torch.utils.data.Dataset):
         return img, ann 
         
 class HoldoutDataset(torch.utils.data.Dataset):
-    def __init__(self, prompts, transform):
+    def __init__(self, prompts):
         self.prompts = prompts
-        self.transform = transform
 
     def __len__(self):
         return len(self.prompts)
@@ -101,7 +137,7 @@ def args_parser():
     args.add_argument('--replace_fn', type=str, default='GEGLU', help='replace function')
     args.add_argument('--keep_nsfw', type=bool, default=True, help='keep nsfw')
     args.add_argument('--dbg', action='store_true', help='debug')
-    args.add_argument('--gpu', type=int, default=7, help='gpu')
+    args.add_argument('--gpu', type=int, default=0, help='gpu')
     args.add_argument('--n_layers', type=int, default=16, help='n layers')
     args.add_argument('--fine_tuned_unet', default=None, help='fine tuned unet')
     args.add_argument('--concepts_to_remove', default=None, help='List of concepts to remove')
@@ -130,8 +166,26 @@ def main():
         data = pd.read_csv('modularity/datasets/holdout100_prompts.csv')
         # create a list of artsist from data
         prompts = data['prompt'].tolist()
-        dataloader = torch.utils.data.DataLoader(HoldoutDataset(prompts, transform), batch_size=args.batch_size, shuffle=False)
-
+        dataloader = torch.utils.data.DataLoader(HoldoutDataset(prompts), batch_size=args.batch_size, shuffle=False)
+    elif args.dataset_type == 'concept_removal':
+        # read dataset file
+        data = pd.read_csv(f'modularity/datasets/concept_removal_{args.concepts_to_remove}.csv')
+        prompts = data['prompt'].tolist()
+        dataloader = torch.utils.data.DataLoader(HoldoutDataset(prompts), batch_size=args.batch_size, shuffle=False)
+    elif args.dataset_type == 'naked_Van_Gogh':
+        # read dataset file
+        data = open(f'modularity/datasets/humans.txt', 'r').readlines()
+        # remove \n
+        data = [d.strip() for d in data]
+        prompts = [f'a photo of a naked {d} in the style of Van Gogh' for d in data]
+        dataloader = torch.utils.data.DataLoader(HoldoutDataset(prompts), batch_size=args.batch_size, shuffle=False)
+    elif args.dataset_type == 'naked_Monet':
+        # read dataset file
+        data = open(f'modularity/datasets/humans.txt', 'r').readlines()
+        # remove \n
+        data = [d.strip() for d in data]
+        prompts = [f'a photo of a naked {d} in the style of Claude Monet' for d in data]
+        dataloader = torch.utils.data.DataLoader(HoldoutDataset(prompts), batch_size=args.batch_size, shuffle=False)
     else:
         raise ValueError("Dataset type not found")
     
@@ -146,11 +200,18 @@ def main():
         remover_model = StableDiffusionPipeline.from_pretrained('CompVis/stable-diffusion-v1-4', unet=unet, torch_dtype=torch.float16)
         remover_model = remover_model.to(args.gpu)
         output_path = f'benchmarking results/{args.fine_tuned_unet}/{args.dataset_type}/{args.concepts_to_remove}'
+    if args.fine_tuned_unet == 'fmn':
+        # Load the pipeline directly
+        print("Loading pipeline directly", fmn_model_dict[args.concepts_to_remove])
+        remover_model = StableDiffusionPipeline.from_pretrained(fmn_model_dict[args.concepts_to_remove], torch_dtype=torch.float16)
+        remover_model = remover_model.to(args.gpu)
+
 
     if args.fine_tuned_unet == 'concept-ablation':
         remover_model = StableDiffusionPipeline.from_pretrained("CompVis/stable-diffusion-v1-4", torch_dtype=torch.float16)
         remover_model = remover_model.to(args.gpu)
-        model_path = os.path.join('../concept-ablation/diffusers', 'logs_ablation', args.concepts_to_remove, 'delta.bin')
+        model_path = os.path.join('../concept-ablation/diffusers', 'logs_ablation', concept_ablation_dict[args.concepts_to_remove], 'delta.bin')
+        print(f"Loading model from {model_path}")
         model_ckpt = torch.load(model_path)
         if 'text_encoder' in model_ckpt:
             remover_model.text_encoder.load_state_dict(model_ckpt['text_encoder'])
@@ -159,12 +220,25 @@ def main():
                 params.data.copy_(model_ckpt['unet'][f'{name}'])
         # remover_model.load_model(os.path.join('../concept-ablation/diffusers', 'logs_ablation', args.concepts_to_remove, 'delta.bin'))
         output_path = f'benchmarking results/{args.fine_tuned_unet}/{args.dataset_type}/{args.concepts_to_remove}'
+    
+    if args.fine_tuned_unet == 'union-timesteps':
+        unet = UNet2DConditionModel.from_pretrained('runwayml/stable-diffusion-v1-5', subfolder="unet", torch_dtype=torch.float16)
+        if args.concepts_to_remove not in  ['naked_Van Gogh', 'naked_Monet']:
+            best_ckpt_path = os.path.join('results/results_seed_0/stable-diffusion/baseline/runwayml/stable-diffusion-v1-5/', 'checkpoints', f'{best_ckpt_dict[args.concepts_to_remove]}')
+        else:
+            best_ckpt_path = os.path.join('results/results_seed_0/stable-diffusion/baseline/runwayml/stable-diffusion-v1-5/', 'checkpoints', f'{args.concepts_to_remove}.pt')
+        # best_ckpt_path = os.path.join('eval_checkpoints', best_paths[args.concepts_to_remove])
+        print(f"Loading model from {best_ckpt_path}")
+        unet.load_state_dict(torch.load(best_ckpt_path))
+        remover_model = StableDiffusionPipeline.from_pretrained('runwayml/stable-diffusion-v1-5', unet=unet, torch_dtype=torch.float16)
+        remover_model = remover_model.to(args.gpu)
+        output_path = f'benchmarking results/{args.fine_tuned_unet}/{args.dataset_type}/{args.concepts_to_remove}'
 
     if args.fine_tuned_unet is None:
         # initalise Wanda neuron remover
         path_expert_indx = os.path.join(args.root_template % (str(args.seed), args.concepts_to_remove), 'skilled_neuron_wanda', str(wanda_thr[args.concepts_to_remove]))
         print(f"Path expert index: {path_expert_indx}")
-        neuron_remover = WandaRemoveNeuronsFast(seed = args.seed, path_expert_indx = path_expert_indx, T = args.timesteps, n_layers = args.n_layers, replace_fn = GEGLU, keep_nsfw =True, remove_timesteps=20)
+        neuron_remover = WandaRemoveNeuronsFast(seed = args.seed, path_expert_indx = path_expert_indx, T = args.timesteps, n_layers = args.n_layers, replace_fn = GEGLU, keep_nsfw =True)
         output_path = f'benchmarking results/unified/{args.dataset_type}/{args.concepts_to_remove}'
 
 
@@ -184,12 +258,12 @@ def main():
 
         torch.manual_seed(args.seed)
         np.random.seed(args.seed)
-        gen_images = model(prompt=prompt, safety_checker=safety_checker_).images
+        # gen_images = model(prompt=prompt, safety_checker=safety_checker_).images
         # save images 
 
         # remove neurons
         if args.concepts_to_remove is not None:
-            if args.fine_tuned_unet in ['uce', 'concept-ablation']:
+            if args.fine_tuned_unet in ['uce', 'concept-ablation', 'union-timesteps']:
                 torch.manual_seed(args.seed)
                 np.random.seed(args.seed)
                 removal_images = remover_model(prompt=prompt, safety_checker=safety_checker_).images
@@ -198,120 +272,18 @@ def main():
                 removal_images, _ = neuron_remover.observe_activation(model, prompt)
 
         # stitch images and save
-        for i, image in enumerate(gen_images):
+        for i, image in enumerate(removal_images):
             # num_images observed till now
             num_images = iter * args.batch_size + i
             image.save(os.path.join(output_path, f"sd_{num_images}.png"))
-            # save original image
-            if args.dataset_type == 'coco':
-                # only save image for coco dataset
-                save_image = img[i] * 255
-                save_image = save_image.to(torch.uint8)
-                save_image = transforms.ToPILImage()(save_image)
-                save_image.save(os.path.join(output_path, f"original_{num_images}.png"))
 
             if args.concepts_to_remove is not None:
                 removal_images[i].save(os.path.join(output_path, f"removed_{num_images}.png"))
-        
 
-
-    # Get concept checkets
-    # memorized_checker = MemorizedPromptChecker(device=args.gpu, objects=things, neg_objects=None)
-    # nudity_checker = NudityChecker(device=args.gpu, objects=humans, neg_objects=things)
-    # art_style_checker = ArtStyleChecker(device=args.gpu, objects=things, neg_objects=humans)
-
-    # # initialise neuron receivers
-    # all_concepts_to_remove = []
-    # if 'naked' in args.concepts_to_remove:
-    #     all_concepts_to_remove += ['naked']
-    # if 'art' in args.concepts_to_remove:
-    #     all_concepts_to_remove += art_styles
-    # if 'memorize' in args.concepts_to_remove:
-    #     all_concepts_to_remove += ['memorize']
     
-    # # SD model
-    # model, num_geglu, replace_fn = utils.get_sd_model(args)
-    # model = model.to(args.gpu)
 
-    # clip_image_processor = CLIPProcessor.from_pretrained("openai/clip-vit-large-patch14")
-    # clip_image_encoder = CLIPModel.from_pretrained("openai/clip-vit-large-patch14")
-    
-    # neuron_remover = MultiConceptRemoverWanda(root = args.root_template, seed = args.seed, 
-    #         T = args.timesteps, n_layers = args.n_layers, replace_fn = GEGLU, 
-    #         keep_nsfw = args.keep_nsfw, concepts_to_remove = all_concepts_to_remove, wanda_thr=wanda_thr)
-
-    # output_path = os.path.join('benchmarking results', 'unified', 'coco')
-    # if not os.path.exists(output_path):
-    #     os.makedirs(output_path)
-
-    # results = {}
-
-    # original_images, removal_images = [], []
-    # score = []
-    # iter = 0
-    # for img, prompt in tqdm.tqdm(zip(imgs, anns)):
-    #     if args.dbg and iter > 5:
-    #         break
-    #     torch.manual_seed(args.seed)
-    #     np.random.seed(args.seed)
-    #     orig_image = Image.open(os.path.join('../COCO-vqa', img))
-    #     generated_image = model(prompt=prompt).images[0]
-    #     original_images.append(transform(Image.open(os.path.join('../COCO-vqa', img)))) # original image
-    #     # find concpet if present
-    #     remove_nudity = nudity_checker.decide(prompt)
-    #     remove_art_style = art_style_checker.decide(prompt)
-    #     remove_memorized = memorized_checker.decide(prompt)
-    #     pred = [remove_nudity, remove_art_style]
-    #     concept_remove = []
-    #     if remove_nudity == 'naked' and 'naked' in all_concepts_to_remove:
-    #         concept_remove.append('naked')
-    #     if remove_art_style != 'none' and remove_art_style in all_concepts_to_remove:
-    #         concept_remove.append(remove_art_style)
-    #     if remove_memorized == 'memorize' and 'memorize' in all_concepts_to_remove:
-    #         concept_remove.append('memorize')
-
-    #     # remove neurons if concept is detected
-    #     print(f'Prompt: {prompt}', f'Prediction: {concept_remove}')
-    #     results[prompt] = {}
-    #     results[prompt]['pred'] = concept_remove
-    #     # check if concepts need to be removed
-    #     if len(concept_remove) > 0:
-    #         output_after_removal, single_image_removal = neuron_remover.remove_concepts(model, prompt, concept_remove)
-    #         name = '_'.join(concept_remove)
-    #         output_after_removal.save(os.path.join(output_path, f'{iter}_{name}.png'))
-    #         removal_images.append(transform(output_after_removal))
-    #     else:
-    #         output_after_removal = generated_image
-    #         removal_images.append(transform(generated_image))
-        
-    #     # clip score
-    #     inputs = clip_image_processor(images = orig_image, return_tensors = 'pt', padding = True)
-    #     orig_features = clip_image_encoder.get_image_features(**inputs)
-
-    #     inputs = clip_image_processor(images = output_after_removal, return_tensors = 'pt', padding = True)
-    #     removal_features = clip_image_encoder.get_image_features(**inputs)
-
-    #     print(f"Original features: {orig_features.shape}, Removal features: {removal_features.shape}")
-
-    #     similarity = torch.nn.functional.cosine_similarity(orig_features, removal_features, dim = -1)
-    #     print(similarity.item())
-    #     score.append(similarity.item())
-    #     iter += 1
-
-    # original_images = torch.stack(original_images) * 255
-    # removal_images = torch.stack(removal_images) * 255
-    # # convert to unit8
-    # original_images = original_images.to(torch.uint8)
-    # removal_images = removal_images.to(torch.uint8)
-    # fid = calculate_fid(original_images, removal_images)
-    # score = np.mean(score)
-
-    # print(f"FID: {fid}, Score: {score}")
-    # results['fid'] = fid
-    # results['score'] = score
-    # # write to file
-    # with open(os.path.join(output_path, 'results.json'), 'w') as f:
-    #     json.dump(results, f)
 
 if __name__ == '__main__':
     main()
+
+# python benchmarks/eval_coco.py --fine_tuned_unet union-timesteps --dataset_type coco --concepts_to_remove all_imagenette_objects --seed 0 --gpu 1 

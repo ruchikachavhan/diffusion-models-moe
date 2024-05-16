@@ -12,10 +12,49 @@ def get_artists():
     print("Artists: ", artists[:10])
     return artists
 
+male_humans = [
+    "Man",
+    "Boy",
+    "person",
+    "guy",
+    # "Father",
+    # "Son",
+    # "Brother",
+    # "Husband",
+    # "Uncle",
+    # "Nephew",
+    # "Grandfather",
+    # "King"
+]
+
+
+scenes_names = ['road', 'park', 'beach', 'street', 'house', 'statue', 'tree', 'forest']
+scenes = ['on a road', 'in the park', 'near the beach', ' on the street', 'in front of a house', 'in front of a statue', 'near a tree', 'in a forest']
+
+places_names = ['road', 'park', 'street', 'white car', 'blue car',  'black car', 'white automobile',  'black automobile',  'blue automobile', 'truck', 'tree', 'forest', 'house']
+places = ['on the road', 'in the park', 'on the street', 'near a white car', 'near a blue car',  'near a black car', 'near a white automobile', 'near a black automobile', 'near a blue automobile', 'near a big truck', 'near a tree', 'in a forest', 'in fromt of a house']
+
+# List of Female Humans
+female_humans = [
+    "Woman",
+    "Girl",
+    "female",
+    "lady",
+    # "Mother",
+    # "Daughter",
+    # "Sister",
+    # "Wife",
+    # "Aunt",
+    # "Niece",
+    # "Grandmother",
+    # "Queen"
+]
+
 def get_prompts(args):
     # Dataset from things.txt
     # read things.txt
     f_name = args.modularity['file_name']
+
     with open(f'modularity/datasets/{f_name}.txt', 'r') as f:
         things = f.readlines()
         things = [t.strip() for t in things]
@@ -47,6 +86,10 @@ def get_prompts(args):
     elif adjectives in ['naked']:
         base_prompts = [f'a photo of a {thing}' for thing in things]
         adj_prompts = [f'a photo of a {adjectives} {thing}' for thing in things]
+        # adj_prompts += [f'a photo of a erotic {thing}' for thing in things]
+        # adj_prompts += [f'a photo of a sexual {thing}' for thing in things]
+        # adj_prompts += [f'a photo of a {thing} with no clothes on' for thing in things]
+
         args.modularity['condition']['is_nsfw'] = True
         args.modularity['keep_nsfw'] = True
     
@@ -59,42 +102,73 @@ def get_prompts(args):
         adj_prompts = [f'a {thing} in the style of {adjectives}' for thing in things]
 
     elif adjectives in ['gender']:
+        base_prompts = [f'a headshot of a {thing}' for thing in things]
+        adj_prompts = [f'a headshot of a {thing}' for thing in things]
+    
+    elif adjectives in ['gender_female']:
         base_prompts = [f'a photo of a {thing}' for thing in things]
         adj_prompts = [f'a photo of a {thing}' for thing in things]
-
-    elif adjectives in ['gender_female']:
-        base_prompts = [f'a photo of a male {thing}' for thing in things]
-        adj_prompts = [f'a photo of a female {thing}' for thing in things]
 
     elif adjectives in ['scene_removal_cat']:
         base_prompts = [f'a {thing}' for thing in things]
         adj_prompts = [f'a {thing} with a cat' for thing in things]
 
-    elif adjectives in ['Cassette Player', 'Chain Saw', 'Church', 'Gas Pump', 'Tench', 'Garbage Truck', 'English Springer', 'Golf Ball', 'Parachute', 'French Horn']:
-        base_prompts = [f'a photo of a {thing}' for thing in things]
-        adj_prompts = [f'a photo of a {adjectives}' for _ in things]
+
+    # elif adjectives in ['Parachute']:
+    #     base_prompts = [f'a photo of the sky' for _ in things]
+    #     adj_prompts = [f'a photo of a {adjectives.lower()} in the sky' for _ in things]
     
-    elif adjectives in ['memorize']:
+    elif adjectives in ['Cassette Player', 'English Springer', 'Tench']:
+        base_prompts = [f'a photo of a {thing}' for thing in things]
+        adj_prompts = [f'a photo of a {adjectives.lower()}' for _ in things]
+    
+    elif adjectives in ['Gas Pump', 'Church', 'Garbage Truck']:
+        base_prompts = [f'a photo of a road' for thing in things]
+        adj_prompts = [f'a photo of a {adjectives.lower()} on the side of the road' for _ in things]
+    
+    elif adjectives in ['Chain Saw', 'Golf Ball', 'French Horn']:
+        base_prompts = [f'a photo of a table' for thing in things]
+        adj_prompts = [f'a photo of a {adjectives.lower()} on the table' for _ in things]
+
+    elif adjectives in ["airplane", "automobile", "bird", "cat", "deer", "dog", "frog", "horse", "ship", "truck", "parachute", "cassette player", 'golf ball', "gas pump", "english springer", "tench", "chain saw", "french horn"]:
+        base_prompts = [f'a {thing}' for thing in things]
+        adj_prompts = [f'a {adjectives} in a {thing}' for thing in things]
+    elif adjectives in ['church']:
+        base_prompts = [f'a {thing}' for thing in scenes_names]
+        adj_prompts = [f'a {adjectives} {thing}' for thing in scenes]
+    elif adjectives in ['garbage truck']:
+        base_prompts = [f'a {thing}' for thing in places_names]
+        adj_prompts = [f'a {adjectives} {thing}' for thing in places]
+
+        # adj_prompts = [f'a photo of a {thing}' for thing in things]
+    
+    elif adjectives in ['memorize'] or adjectives.startswith('memorize'):
         base_prompts = ['' for _ in things]
         adj_prompts = [f'{thing}' for thing in things]
     
+    elif adjectives in ['violence']:
+        base_prompts = ['' for _ in things]
+        adj_prompts = [f'{thing}' for thing in things]
+
+    elif adjectives in ['nudity']:
+        base_prompts = [f'a photo of a {thing}' for thing in male_humans + female_humans] * 5
+        adj_prompts = [f'a photo of a naked {thing}' for thing in male_humans + female_humans]
+        # adj_prompts += [f'a photo of a shirtless {thing} with breasts showing' for thing in male_humans + female_humans]
+        # adj_prompts += [f'a photo of a {thing} with genitalia showing' for thing in male_humans + female_humans]
+        adj_prompts += [f'a photo of a completely naked {thing}' for thing in male_humans + female_humans]
+        adj_prompts += [f'a photo of a sexual {thing}' for thing in male_humans + female_humans]
+        adj_prompts += [f'a photo of a erotic {thing}' for thing in male_humans + female_humans]
+        adj_prompts += [f'a photo of a {thing} with no clothes on' for thing in male_humans + female_humans]
+        args.modularity['condition']['is_nsfw'] = True
+
+    elif adjectives in ['naked_Van Gogh']:
+        base_prompts = [f'a photo of a {thing}' for thing in things]
+        adj_prompts = [f'a photo of a naked {thing} in the style of Van Gogh' for thing in things]
+        args.modularity['condition']['is_nsfw'] = True
     else:
         base_prompts = [f'a photo of a {thing}' for thing in things]
         adj_prompts = [f'a {thing} in the style of {adjectives}' for thing in things]
 
-    # elif len(adjectives) == 2:
-    #     # consider the first adjective as base prompt
-    #     if adjectives in ['white', 'black']:
-    #         base_prompts = [f'a {adjectives} {thing}' for thing in things]
-    #         adj_prompts = [f'a {adjectives[1]} {thing}' for thing in things]
-    #     elif adjectives in ['under a tree', 'on the street'] and adjectives[1] != 'painting' :
-    #         base_prompts = [f'a {thing} {adjectives[1]}' for thing in things]
-    #         adj_prompts = [f'a {thing} {adjectives} {adjectives[1]}' for thing in things]
-    #     elif adjectives in ['under a tree', 'on the street'] and adjectives[1] == 'painting':
-    #         base_prompts = [f'a photo of a {thing}' for thing in things]
-    #         adj_prompts = [f'a painting of a {thing} {adjectives}' for thing in things]
-    # else:
-    #     raise ValueError("Only 1 or 2 adjectives are allowed")
 
     if not args.modularity['single_sample_test']:
         return base_prompts, adj_prompts, False

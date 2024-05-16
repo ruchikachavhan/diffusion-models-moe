@@ -94,6 +94,7 @@ def args_parser():
     args.add_argument('--fine_tuned_unet', default=None, help='fine tuned unet')
     args.add_argument('--concepts_to_remove', default='memorize', help='List of concepts to remove')
     args.add_argument('--dataset_type', default='memorize', help='dataset path')
+    args.add_argument('--skill_method', default='wanda', help='dataset path')
     args.add_argument('--root-template', default='results/results_seed_%s/stable-diffusion/baseline/runwayml/stable-diffusion-v1-5/modularity/%s', help='root template')
     args.add_argument('--timesteps', default=51, type=int, help='Timesteps')
     args.add_argument('--batch_size', default=4, type=int, help='Batch size')
@@ -101,6 +102,14 @@ def args_parser():
 
     args = args.parse_args()
     return args
+
+from diffusers.pipelines.stable_diffusion import safety_checker
+
+def sc(self, clip_input, images):
+    return images, [False for i in images]
+
+safety_checker.StableDiffusionSafetyChecker.forward = sc
+safety_checker_ = safety_checker.StableDiffusionSafetyChecker
 
 def main():
     args = args_parser()
@@ -137,12 +146,26 @@ def main():
         # remover_model.load_model(os.path.join('../concept-ablation/diffusers', 'logs_ablation', args.concepts_to_remove, 'delta.bin'))
         output_path = f'benchmarking results/{args.fine_tuned_unet}/{args.dataset_type}/{args.concepts_to_remove}'
 
+    if args.fine_tuned_unet == 'union-timesteps':
+        unet = UNet2DConditionModel.from_pretrained(args.model_id, subfolder="unet", torch_dtype=torch.float16)
+        if args.skill_method == 'wanda':
+            root_template = f'eval_checkpoints'
+            best_ckpt_path = os.path.join(root_template, f'{args.concepts_to_remove}_0.4.pt')
+        elif args.skill_method == 'AP':
+            root_template = f'eval_checkpoints_ap'
+            best_ckpt_path = os.path.join(root_template, f'{args.concepts_to_remove}.pt')
+        print(f"Best checkpoint path: {best_ckpt_path}")
+        unet.load_state_dict(torch.load(best_ckpt_path))
+        remover_model = StableDiffusionPipeline.from_pretrained(args.model_id, unet=unet, torch_dtype=torch.float16)
+        output_path = f'benchmarking results/{args.fine_tuned_unet}/{args.dataset_type}/{args.concepts_to_remove}/{args.skill_method}' 
+        remover_model = remover_model.to(args.gpu)
+
     if args.fine_tuned_unet is None:
         # initalise Wanda neuron remover
         path_expert_indx = os.path.join(args.root_template % (str(args.seed), args.concepts_to_remove), 'skilled_neuron_wanda', '0.01')
         print(f"Path expert index: {path_expert_indx}")
-        neuron_remover = WandaRemoveNeuronsFast(seed = args.seed, path_expert_indx = path_expert_indx, T = args.timesteps, n_layers = args.n_layers, replace_fn = GEGLU, keep_nsfw =True, remove_timesteps=20)
-        output_path = f'benchmarking results/unified/{args.dataset_type}/{args.concepts_to_remove}'
+        neuron_remover = WandaRemoveNeuronsFast(seed = args.seed, path_expert_indx = path_expert_indx, T = args.timesteps, n_layers = args.n_layers, replace_fn = GEGLU, keep_nsfw =True)
+        output_path = f'benchmarking results/unified/{args.dataset_type}/{args.concepts_to_remove}/random_seed'
 
 
     if not os.path.exists(output_path):
@@ -157,12 +180,22 @@ def main():
         print(f"Prompt: {prompt}")
         iter +=1 
 
+
         # Step 2 - Generate the image
-        if not os.path.exists(f"{output_path}/{im_index}.png"):
+        if True:
             if args.fine_tuned_unet is None:
+                seed = torch.randint(0, 250, (1,)).item()
+                neuron_remover.seed = seed
                 neuron_remover.reset_time_layer()
                 image, _ = neuron_remover.observe_activation(model, prompt)
                 # save the image 
+                image.save(f"{output_path}/{im_index}.png")
+            elif args.fine_tuned_unet in ['concept-ablation', 'union-timesteps']:
+                # fix seed
+                seed = torch.randint(0, 10000, (1,)).item()
+                torch.manual_seed(seed)
+                np.random.seed(seed)
+                image = remover_model(prompt, safety_checker = safety_checker_).images[0]
                 image.save(f"{output_path}/{im_index}.png")
         else:
             print(f"Image already exists at {output_path}/{im_index}.png")

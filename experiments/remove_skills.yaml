@@ -3,14 +3,15 @@ moefication:
   expert_size: 20
   templates: '%s.%s.attentions.%s.transformer_blocks.0.ff.net.0.proj.weight'
   topk_experts: 0.2
+hook_module: 'unet'
 modularity:
-  adjective: 'gender'
-  file_name: 'male_professions'
+  adjective: 'memorize_0'
+  file_name: memorize_0
   keep_nsfw: false
   concept_removal: true
   condition:
-    name: 'wanda'
-    skill_ratio: 0.02
+    name: 'AP'
+    skill_ratio: 0.1
     remove_neurons: true
   bounding_box: false
   single_sample_test: false
@@ -47,7 +48,7 @@ model_id: 'runwayml/stable-diffusion-v1-5'
 n_layers: 16
 fine_tuned_unet: null
 # fine_tuned_unet: '../diffusers/examples/text_to_image/relufied-stable-diffusion-v1-5/checkpoint-14000/'
-gpu: 7
+gpu: 1
 seed: 0
 default_eval_seed: 42
 timesteps: 51

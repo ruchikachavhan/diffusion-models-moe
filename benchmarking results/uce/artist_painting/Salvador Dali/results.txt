@@ -1,0 +1,2 @@
+Average CLIP score: 0.8492664563655853
+Average accuracy: 0.8

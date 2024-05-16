@@ -7,14 +7,20 @@ from torch.nn.functional import relu
 
 
 class Wanda(BaseNeuronReceiver):
-    def __init__(self, seed, T, n_layers, replace_fn = GEGLU, keep_nsfw=False):
-        super(Wanda, self).__init__(seed, replace_fn, keep_nsfw)
+    def __init__(self, seed, T, n_layers, replace_fn = GEGLU, keep_nsfw=False, hook_module='unet'):
+        super(Wanda, self).__init__(seed, replace_fn, keep_nsfw, hook_module)
         self.T = T
         self.n_layers = n_layers
-        self.predictivity = utils.TimeLayerColumnNorm(T, n_layers)
+        if hook_module == 'unet':
+            self.predictivity = utils.TimeLayerColumnNorm(T, n_layers)
+        elif hook_module == 'text':
+            self.predictivity = {}
+            for l in range(self.n_layers):
+                self.predictivity[l] = utils.ColumnNormCalculator()
         self.timestep = 0
         self.layer = 0
         self.replace_fn = replace_fn
+        self.hook_module = hook_module
     
     def update_time_layer(self):
         if self.layer == self.n_layers - 1:
@@ -26,6 +32,7 @@ class Wanda(BaseNeuronReceiver):
     def reset_time_layer(self):
         self.timestep = 0
         self.layer = 0
+    
     
     def hook_fn(self, module, input, output):
         # save the out
@@ -48,6 +55,22 @@ class Wanda(BaseNeuronReceiver):
             self.update_time_layer()
 
             return hidden_states * module.gelu(gate)
+        
+    def text_hook_fn(self, module, input, output):
+        
+        hidden_states = module.fc1(input[0])
+        hidden_states = module.activation_fn(hidden_states)
+
+        save_gate = hidden_states.clone().detach().cpu()
+        save_gate = save_gate.view(-1, hidden_states.shape[-1])
+        save_gate = torch.nn.functional.normalize(save_gate, p=2, dim=1)
+        if self.layer < self.n_layers:
+            self.predictivity[self.layer].add_rows(save_gate)
+            
+        hidden_states = module.fc2(hidden_states)
+        self.update_time_layer()
+        return hidden_states
+    
     
     def test(self, model, ann = ['a cat', 'a dog']):
         '''Test if the norm calculator works okay'''

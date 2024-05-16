@@ -14,9 +14,9 @@ class RemoveNeurons(NeuronPredictivity):
             self.expert_indices[i] = {}
             for j in range(0, n_layers):
                 # read file 
-                print(os.path.join(path_expert_indx, f'timestep_{i}_layer_{j}.json'))
-                self.expert_indices[i][j] = json.load(open(os.path.join(path_expert_indx, f'timestep_{i}_layer_{j}.json'), 'r'))
-                print(f'timestep_{i}_layer_{j}.json', self.expert_indices[i][j])
+                print(os.path.join(path_expert_indx, f'predictivity_{i}_{j}.json'))
+                self.expert_indices[i][j] = json.load(open(os.path.join(path_expert_indx, f'predictivity_{i}_{j}.json'), 'r'))
+                print(f'predictivity_{i}_{j}.json', self.expert_indices[i][j])
         self.timestep = 0
         self.layer = 0
         self.gates = []

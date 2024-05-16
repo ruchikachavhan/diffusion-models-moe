@@ -130,6 +130,11 @@ def get_sd_model(args):
         replace_fn = GEGLU
         print("Number of GEGLU layers", num_geglu)
 
+    if args.hook_module == 'unet':
+        num_geglu = num_geglu
+    elif args.hook_module == 'text':
+        num_geglu = 12
+
     return model, num_geglu, replace_fn
 
 def coco_dataset(data_path, split, num_images=1000):
@@ -156,7 +161,11 @@ class Config:
             setattr(self, key, value)
         
         if self.seed!='all':
-            self.res_path = f'results/results_seed_{self.seed}' + '/' + self.res_path.split('/')[1]
+            if self.hook_module == 'unet':
+                self.res_path = f'results/results_seed_{self.seed}' + '/' + self.res_path.split('/')[1]
+            elif self.hook_module == 'text':
+                self.res_path = f'results_skilled_CLIP/results_seed_{self.seed}' + '/' + self.res_path.split('/')[1]
+        
         elif self.seed == 'all':
             self.res_path = 'results/results_all_seeds' + '/' + self.res_path.split('/')[1]
             self.seed = self.default_eval_seed
@@ -174,7 +183,10 @@ class Config:
 
         # Folders fo modularity experiments 
         if exp_name == 'modularity':  
-            if self.modularity['adjective'] in ['gender', 'gender_female', 'scene_removal_cat', 'Cassette Player', 'naked', 'memorize', 'art10', 'art10_naked']:
+            if self.modularity['adjective'] in ['gender', 'gender_female', 'scene_removal_cat', 'Cassette Player',
+                                         'naked', 'violence', 'memorize', 'art10', 'art10_naked', 'Cassette Player', 
+                                         'Chain Saw', 'Church', 'Gas Pump', 'Tench', 'Garbage Truck', 'English Springer', 
+                                         'Golf Ball', 'Parachute', 'French Horn'] or self.modularity['adjective'].startswith('memorize'):
                 self.save_path = os.path.join(self.res_path, self.model_id, exp_name, self.modularity['adjective'])
             else:
                 self.save_path = os.path.join(self.res_path, self.model_id, exp_name, 'art', self.modularity['adjective'])
@@ -188,7 +200,7 @@ class Config:
             else:
                 prefix = ''
             if self.modularity['concept_removal']:
-                if self.modularity['condition']['name'] in ['t_test', 'wanda']:
+                if self.modularity['condition']['name'] in ['t_test', 'wanda', 'AP']:
                     self.modularity['skill_expert_path'] = os.path.join(self.save_path, prefix, f'skilled_expert_{condition}', str(ratio))
                     self.modularity['skill_neuron_path'] = os.path.join(self.save_path, prefix, f'skilled_neuron_{condition}', str(ratio))
                 elif self.modularity['condition']['name'] == 'moefy_compare':

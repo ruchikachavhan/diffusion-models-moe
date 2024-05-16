@@ -14,6 +14,8 @@ from neuron_receivers import RemoveExperts, RemoveNeurons, WandaRemoveNeurons, W
 sys.path.append('moefication')
 from helper import modify_ffn_to_experts
 from PIL import ImageDraw, ImageFont
+from diffusers.models.activations import GEGLU
+from diffusers import UNet2DConditionModel, StableDiffusionPipeline
  
 # if msfw is on, blur the image a 100 times
 def blur_image(image, is_nsfw):
@@ -22,12 +24,12 @@ def blur_image(image, is_nsfw):
             image = image.filter(ImageFilter.BLUR)
     return image
 
-def remove_experts(adj_prompts, model, neuron_receiver, args, bounding_box, save_path, base_prompts=None):
+def remove_experts(adj_prompts, model, neuron_receiver, args, bounding_box, save_path_root, base_prompts=None):
     
     # run experiment on multiple seeds
-    seeds = np.arange(0, 250, 1)
+    seeds = np.arange(31, 250, 1)
     for seed in seeds:
-        save_path = os.path.join(save_path, f'seed_{seed}')
+        save_path = os.path.join(save_path_root, f'seed_{seed}')
         if not os.path.exists(save_path):
             os.makedirs(save_path)
         # fix seed
@@ -103,84 +105,103 @@ def main():
     hparams = None
     hpo_method = None
 
-
-    args.configure('modularity')
-    if hpo_method is not None:
-        args.modularity['remove_neuron_path'] = os.path.join(args.modularity['remove_neuron_path'], hpo_method)
-        args.modularity['remove_neuron_path_val'] = os.path.join(args.modularity['remove_neuron_path_val'], hpo_method)
-    if all_timesteps:
-        # change remove_neurons_path
-        args.modularity['remove_neuron_path'] = os.path.join(args.modularity['remove_neuron_path'], 'all_timesteps')
-        args.modularity['remove_neuron_path_val'] = os.path.join(args.modularity['remove_neuron_path_val'], 'all_timesteps')
-    if not os.path.exists(args.modularity['remove_neuron_path']):
-        os.makedirs(args.modularity['remove_neuron_path'])
-    if not os.path.exists(args.modularity['remove_neuron_path_val']):
-        os.makedirs(args.modularity['remove_neuron_path_val'])
-
-    # model 
-    model, num_geglu, replace_fn = utils.get_sd_model(args)
-    args.replace_fn = replace_fn
-    model = model.to(args.gpu)
-
-    weights_shape = {}
-    for name, module in model.unet.named_modules():
-        if isinstance(module, LoRACompatibleLinear) and 'ff.net' in name and not 'proj' in name:
-            weights_shape[name] = module.weight.shape
-    # sort keys
-    weights_shape = dict(sorted(weights_shape.items()))
-    weights_shape = [weights_shape[key] for key in weights_shape.keys()]
-    print("Weights shape: ", weights_shape)
-
-    # Neuron receiver with forward hooks
     
-    if args.modularity['condition']['name'] == 't_test':
-        func = RemoveNeurons if args.modularity['condition']['remove_neurons'] else RemoveExperts
-    elif args.modularity['condition']['name'] == 'wanda':
-        func = WandaRemoveNeuronsFast
-    neuron_receiver =  func(seed=args.seed, path_expert_indx = args.modularity['skill_expert_path'] if not args.modularity['condition']['remove_neurons'] else args.modularity['skill_neuron_path'],
-                            T=args.timesteps, n_layers=num_geglu, replace_fn=replace_fn, keep_nsfw=args.modularity['keep_nsfw'], 
-                            remove_timesteps = hparams, weights_shape = weights_shape)
-                                           
-    # read file
-    with open(os.path.join('modularity/datasets', args.modularity['file_name']+'.txt'), 'r') as f:
-        objects = f.readlines()
-    objects = [obj.strip() for obj in objects]
+    if args.fine_tuned_unet is None:
+        args.configure('modularity')
+        if hpo_method is not None:
+            args.modularity['remove_neuron_path'] = os.path.join(args.modularity['remove_neuron_path'], hpo_method)
+            args.modularity['remove_neuron_path_val'] = os.path.join(args.modularity['remove_neuron_path_val'], hpo_method)
+        if all_timesteps:
+            # change remove_neurons_path
+            args.modularity['remove_neuron_path'] = os.path.join(args.modularity['remove_neuron_path'], 'all_timesteps')
+            args.modularity['remove_neuron_path_val'] = os.path.join(args.modularity['remove_neuron_path_val'], 'all_timesteps')
+        if not os.path.exists(args.modularity['remove_neuron_path']):
+            os.makedirs(args.modularity['remove_neuron_path'])
+        if not os.path.exists(args.modularity['remove_neuron_path_val']):
+            os.makedirs(args.modularity['remove_neuron_path_val'])
+        # model 
+        model, num_geglu, replace_fn = utils.get_sd_model(args)
+        args.replace_fn = replace_fn
+        model = model.to(args.gpu)
+        # Neuron receiver with forward hooks
+        
+        if args.modularity['condition']['name'] == 't_test':
+            func = RemoveNeurons if args.modularity['condition']['remove_neurons'] else RemoveExperts
+        elif args.modularity['condition']['name'] == 'wanda':
+            func = WandaRemoveNeuronsFast
+        neuron_receiver =  func(seed=args.seed, path_expert_indx = args.modularity['skill_expert_path'] if not args.modularity['condition']['remove_neurons'] else args.modularity['skill_neuron_path'],
+                                T=args.timesteps, n_layers=num_geglu, replace_fn=replace_fn, keep_nsfw=args.modularity['keep_nsfw'])
+                                            
+        # read file
+        with open(os.path.join('modularity/datasets', args.modularity['file_name']+'.txt'), 'r') as f:
+            objects = f.readlines()
+        objects = [obj.strip() for obj in objects]
 
-    if args.modularity['bounding_box']:
-        # read bounding box coordinates
-        with open(os.path.join(args.save_path, 'bb_coordinates_layer_adj.json')) as f:
-            bb_coordinates_layer_adj = json.load(f)
-            print(bb_coordinates_layer_adj.keys())
-        with open(os.path.join(args.save_path, 'bb_coordinates_layer_base.json')) as f:
-            bb_coordinates_layer_base = json.load(f)
-    # COnvert FFns into moe
-    # set args.moefication['topk_experts'] = 1 to keep all the experts  
-    # so that all experts are being used in the model and the ones removed are the skilled ones
-    # args.moefication['topk_experts'] = 1.0
-    # model, _, _ = modify_ffn_to_experts(model, args)
-    
-    # remove experts
-    remove_experts(adj_prompts, model, neuron_receiver, args, 
-                   bounding_box=bb_coordinates_layer_adj if args.modularity['bounding_box'] else None, 
-                   save_path=args.modularity['remove_expert_path'] if not args.modularity['condition']['remove_neurons'] else args.modularity['remove_neuron_path'], 
-                     base_prompts=base_prompts)
+        if args.modularity['bounding_box']:
+            # read bounding box coordinates
+            with open(os.path.join(args.save_path, 'bb_coordinates_layer_adj.json')) as f:
+                bb_coordinates_layer_adj = json.load(f)
+                print(bb_coordinates_layer_adj.keys())
+            with open(os.path.join(args.save_path, 'bb_coordinates_layer_base.json')) as f:
+                bb_coordinates_layer_base = json.load(f)
+        
+        output_path = 'benchmarking results/unified/debiasing_' + args.modularity['adjective']
+        if not os.path.exists(output_path):
+            os.makedirs(output_path)
+        # remove experts
+        remove_experts(adj_prompts, model, neuron_receiver, args, 
+                    bounding_box=bb_coordinates_layer_adj if args.modularity['bounding_box'] else None, 
+                    save_path_root=output_path,
+                        base_prompts=base_prompts)
+        
+    if args.fine_tuned_unet == 'union-timesteps':
+        args.concepts_to_remove = args.modularity['adjective']
+        args.dataset_type = args.modularity['file_name']
+        unet = UNet2DConditionModel.from_pretrained(args.model_id, subfolder="unet", torch_dtype=torch.float16)
+        root_template = f'results/results_seed_%s/stable-diffusion/baseline/{args.model_id}'
+        best_ckpt_path = os.path.join(root_template % (str(args.seed)), 'checkpoints', f'{args.concepts_to_remove}_0.4.pt')
+        print(f"Loading fine-tuned UNet from {best_ckpt_path}")
+        unet.load_state_dict(torch.load(best_ckpt_path))
+        remover_model = StableDiffusionPipeline.from_pretrained(args.model_id, unet=unet, torch_dtype=torch.float16)
+        output_path = f'benchmarking results/{args.fine_tuned_unet}/{args.dataset_type}/{args.concepts_to_remove}'
+        remover_model = remover_model.to(args.gpu)
 
-    # read val_dataset
-    # if not os.path.exists(f'modularity/datasets/val_things_{adjective}.txt'):
-    #     print(f"Validation dataset not found for {adjective}")
-    #     return
-    
-    # with open(f'modularity/datasets/val_things_{adjective}.txt') as f:
-    #     val_objects = f.readlines()
-    
-    # val_base_prompts = [f'{thing.strip()}' for thing in val_objects]
-    
-    # # remove experts from val_dataset
-    # remove_experts(val_base_prompts, model, neuron_receiver, args, 
-    #                bounding_box=args.modularity['bounding_box'] if args.modularity['bounding_box'] else None,
-    #                 save_path=args.modularity['remove_expert_path_val'] if not args.modularity['condition']['remove_neurons'] else args.modularity['remove_neuron_path_val'], 
-    #                 base_prompts=None)
-    
+        model = StableDiffusionPipeline.from_pretrained(args.model_id, torch_dtype=torch.float16)
+        model = model.to('cuda:0')
+
+        # read file
+        with open(os.path.join('modularity/datasets', args.modularity['file_name']+'.txt'), 'r') as f:
+            objects = f.readlines()
+
+        if not os.path.exists(output_path):
+            os.makedirs(output_path)
+        # remove experts
+        
+        seeds = np.arange(66, 250, 1)
+        for seed in seeds:
+            save_path = os.path.join(output_path, f'seed_{seed}')
+            if not os.path.exists(save_path):
+                os.makedirs(save_path)
+
+            for obj in objects:
+                obj = obj.strip()
+                prompt = f'a photo of a {obj.lower()}'
+                print(f"Object: {prompt}", "Seed: ", seed)
+                # run model for the original text
+                torch.manual_seed(seed)
+                np.random.seed(seed)
+                out = remover_model(prompt).images[0]
+                # save the image
+                out.save(os.path.join(save_path, f'{args.concepts_to_remove}_{obj}.png'))
+
+                # original gender
+                torch.manual_seed(seed)
+                np.random.seed(seed)
+                image = model(prompt).images[0]
+                image.save(os.path.join(save_path, f'{args.concepts_to_remove}_{obj}_original.jpg'))
+                print("Image saved in ", save_path)
+            
+
 
 
 if __name__ == "__main__":

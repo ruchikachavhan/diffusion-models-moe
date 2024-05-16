@@ -27,3 +27,5 @@ modularity/datasets/*.zip
 modularity/datasets/*.tar.gz
 modularity/datasets/*.pt
 'benchmarking results'
+'benchmarking results'/*
+eval*

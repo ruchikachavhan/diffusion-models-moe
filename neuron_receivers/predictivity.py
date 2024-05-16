@@ -7,8 +7,8 @@ from torch.nn.functional import relu
 
 
 class NeuronPredictivity(BaseNeuronReceiver):
-    def __init__(self, seed, T, n_layers, replace_fn = GEGLU, keep_nsfw=False):
-        super(NeuronPredictivity, self).__init__(seed, replace_fn, keep_nsfw)
+    def __init__(self, seed, T, n_layers, replace_fn = GEGLU, keep_nsfw=False, hook_module='unet'):
+        super(NeuronPredictivity, self).__init__(seed, replace_fn, keep_nsfw, hook_module)
         self.T = T
         self.n_layers = n_layers
         self.predictivity = utils.StatMeter(T, n_layers)
